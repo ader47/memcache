@@ -22,6 +22,7 @@
 #include "mmc_meta_container.h"
 #include "mmc_meta_backup_mgr.h"
 #include "mmc_meta_net_server.h"
+#include "mmc_interval_map.h"
 #include "mmc_thread_pool.h"
 #include "mmc_ubs_io_proxy.h"
 
@@ -155,6 +156,8 @@ public:
     Result UpdateState(const std::string &key, const MmcLocation &loc, const BlobActionResult &actRet,
                        uint64_t operateId);
 
+    Result UpdateBlobState(const uint64_t gva, const uint64_t size, const BlobActionResult &actRet);
+
     /**
      * @brief remove the meta object
      * @param key          [in] key of the to-be-removed meta object
@@ -260,6 +263,19 @@ private:
     MetaNetServerPtr metaNetServer_;
     MmcThreadPoolPtr threadPool_;
     MmcUbsIoProxyPtr ubsIoProxy_;
+
+    struct GvaMapInfo {
+        std::string key_{};
+        uint64_t operateId_{0};
+        MmcMemBlobPtr blob_;
+        bool operator==(const GvaMapInfo &other) const
+        {
+            return key_ == other.key_ && operateId_ == other.operateId_;
+        }
+    };
+
+    std::mutex gvaMutex_;
+    MmcIntervalMap<GvaMapInfo> gva2updateMap_;
 };
 using MmcMetaManagerPtr = MmcRef<MmcMetaManager>;
 } // namespace mmc

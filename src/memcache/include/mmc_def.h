@@ -125,6 +125,7 @@ typedef struct {
     bool valid;
     uint32_t ranks[MAX_BLOB_COPIES];
     uint16_t types[MAX_BLOB_COPIES];
+    uint64_t gvas[MAX_BLOB_COPIES];
 } mmc_data_info;
 
 #ifdef __cplusplus

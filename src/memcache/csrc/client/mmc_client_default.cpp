@@ -143,17 +143,17 @@ Result MmcClientDefault::Put(const char *key, mmc_buffer *buf, mmc_put_options &
     return Put(key, buffArr, options, flags);
 }
 
-Result MmcClientDefault::PrepareAllocOpt(const MmcBufferArray &bufArr, const mmc_put_options &options, uint32_t flags,
+Result MmcClientDefault::PrepareAllocOpt(const uint64_t blobSize, const mmc_put_options &options, uint32_t flags,
                                          AllocOptions &allocOpt)
 {
-    allocOpt.blobSize_ = bufArr.TotalSize();
+    allocOpt.blobSize_ = blobSize;
     allocOpt.numBlobs_ = std::max<uint16_t>(options.replicaNum, 1u);
     allocOpt.mediaType_ = MEDIA_NONE;
     allocOpt.flags_ = flags;
 
     std::copy_if(std::begin(options.preferredLocalServiceIDs), std::end(options.preferredLocalServiceIDs),
                  std::back_inserter(allocOpt.preferredRank_), [](const int32_t x) { return x >= 0; });
-     // preferredRank_数量需要小于等于replicaNum， 具体参考 MmcGlobalAllocator Alloc方法说明
+    // preferredRank_数量需要小于等于replicaNum， 具体参考 MmcGlobalAllocator Alloc方法说明
     if (allocOpt.preferredRank_.size() > allocOpt.numBlobs_ || allocOpt.numBlobs_ > MAX_BLOB_COPIES) {
         MMC_LOG_ERROR("preferredRank size:" << allocOpt.preferredRank_.size()
                                             << " is greater than replicaNum:" << allocOpt.numBlobs_);
@@ -161,6 +161,7 @@ Result MmcClientDefault::PrepareAllocOpt(const MmcBufferArray &bufArr, const mmc
     }
 
     if (!allocOpt.preferredRank_.empty()) {
+        allocOpt.flags_ = allocOpt.flags_ & ~0xFF; // 清除原设置
         allocOpt.flags_ |= ALLOC_FORCE_BY_RANK;
     } else {
         allocOpt.preferredRank_.push_back(RankId(options.policy));
@@ -176,7 +177,8 @@ Result MmcClientDefault::Put(const std::string &key, const MmcBufferArray &bufAr
     MMC_ASSERT_RETURN(!bufArr.Buffers().empty(), MMC_ERROR);
     uint64_t operateId = GenerateOperateId(rankId_);
     AllocRequest request{key, {}, operateId};
-    MMC_VALIDATE_RETURN(PrepareAllocOpt(bufArr, options, flags, request.options_) == MMC_OK, "put error", MMC_ERROR);
+    MMC_VALIDATE_RETURN(PrepareAllocOpt(bufArr.TotalSize(), options, flags, request.options_) == MMC_OK, "put error",
+                        MMC_ERROR);
     AllocResponse response;
     MMC_RETURN_ERROR(metaNetClient_->SyncCall(request, response, rpcRetryTimeOut_),
                      "client " << name_ << " alloc " << key << " failed");
@@ -254,8 +256,8 @@ Result MmcClientDefault::BatchPut(const std::vector<std::string> &keys, const st
     BatchAllocRequest request(keys, {}, flags, operateId);
     for (const auto &bufArr : bufArrs) {
         AllocOptions tmpAllocOptions{};
-        MMC_VALIDATE_RETURN(PrepareAllocOpt(bufArr, options, flags, tmpAllocOptions) == MMC_OK, "option param error",
-                            MMC_ERROR);
+        MMC_VALIDATE_RETURN(PrepareAllocOpt(bufArr.TotalSize(), options, flags, tmpAllocOptions) == MMC_OK,
+                            "option param error", MMC_ERROR);
         request.options_.emplace_back(std::move(tmpAllocOptions));
     }
     BatchAllocResponse allocResponse{};
@@ -606,6 +608,7 @@ Result MmcClientDefault::Query(const std::string &key, mmc_data_info &query_info
     for (int i = 0; i < query_info.numBlobs && i < MAX_BLOB_COPIES; i++) {
         query_info.ranks[i] = response.queryInfo_.blobRanks_[i];
         query_info.types[i] = response.queryInfo_.blobTypes_[i];
+        query_info.gvas[i] = response.queryInfo_.blobGvas_[i];
     }
     return MMC_OK;
 }
@@ -628,7 +631,6 @@ Result MmcClientDefault::BatchQuery(const std::vector<std::string> &keys, std::v
     if (response.batchQueryInfos_.size() != keys.size()) {
         MMC_LOG_ERROR("BatchQuery get a response with mismatched size ("
                       << response.batchQueryInfos_.size() << "), should get size (" << keys.size() << ").");
-        MemObjQueryInfo info_fill;
         query_infos.resize(keys.size(), {});
         return MMC_ERROR;
     }
@@ -644,6 +646,7 @@ Result MmcClientDefault::BatchQuery(const std::vector<std::string> &keys, std::v
         for (int i = 0; i < info.numBlobs_ && i < MAX_BLOB_COPIES; i++) {
             outInfo.ranks[i] = info.blobRanks_[i];
             outInfo.types[i] = info.blobTypes_[i];
+            outInfo.gvas[i] = info.blobGvas_[i];
         }
         outInfo.size = info.size_;
         outInfo.prot = info.prot_;
@@ -748,6 +751,34 @@ void MmcClientDefault::AsyncUpdateState(BatchUpdateRequest &updateRequest)
                                        updateRequest);
     if (!future.valid()) {
         SyncUpdateState(updateRequest);
+    }
+}
+
+void MmcClientDefault::SyncUpdateBlobByGva(BatchUpdateBlobRequest &updateRequest)
+{
+    TP_TRACE_BEGIN(TP_MMC_LOCAL_BATCH_UPDATE_BLOB);
+    BatchUpdateResponse updateResponse;
+    Result updateResult = metaNetClient_->SyncCall(updateRequest, updateResponse, rpcRetryTimeOut_);
+    TP_TRACE_END(TP_MMC_LOCAL_BATCH_UPDATE_BLOB, updateResult);
+    if (updateResult != MMC_OK || updateResponse.results_.size() != updateRequest.gvas_.size()) {
+        MMC_LOG_ERROR("client " << name_ << " batch get update failed:" << updateResult << ", gva size:"
+                                << updateRequest.gvas_.size() << ", ret size:" << updateResponse.results_.size());
+    } else {
+        for (size_t i = 0; i < updateRequest.gvas_.size() && i < updateRequest.gvas_.size(); ++i) {
+            if (updateResponse.results_[i] != MMC_OK) {
+                MMC_LOG_ERROR("client " << name_ << " batch put update for gva " << updateRequest.gvas_[i]
+                                        << " failed:" << updateResponse.results_[i]);
+            }
+        }
+    }
+}
+
+void MmcClientDefault::AsyncUpdateBlobByGva(BatchUpdateBlobRequest &updateRequest)
+{
+    auto future = threadPool_->Enqueue(
+        [&](BatchUpdateBlobRequest updateRequestL) { SyncUpdateBlobByGva(updateRequestL); }, updateRequest);
+    if (!future.valid()) {
+        SyncUpdateBlobByGva(updateRequest);
     }
 }
 
@@ -907,6 +938,86 @@ Result MmcClientDefault::UnRegisterBuffer(uint64_t addr, uint64_t size)
 {
     MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     return bmProxy_->UnRegisterBuffer(addr);
+}
+
+Result MmcClientDefault::BatchMalloc(const std::vector<std::string> &keys, const std::vector<size_t> &sizes,
+                                     const mmc_put_options &options, std::vector<uintptr_t> &gvas)
+{
+    MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
+    MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
+
+    if (keys.empty() || sizes.empty() || keys.size() != sizes.size()) {
+        MMC_LOG_ERROR("client " << name_ << " batch get failed: keys size:" << keys.size()
+                                << ", bufArrs size:" << sizes.size());
+        return MMC_INVALID_PARAM;
+    }
+
+    // alloc blobs
+    uint32_t flags = ALLOC_RANDOM | ALLOC_FLAGS_GVA_MALLOC_MASK;
+    uint64_t operateId = GenerateOperateId(rankId_);
+    BatchAllocRequest request(keys, {}, flags, operateId);
+    for (const auto &size : sizes) {
+        AllocOptions tmpAllocOptions{};
+        MMC_VALIDATE_RETURN(PrepareAllocOpt(size, options, flags, tmpAllocOptions) == MMC_OK, "option param error",
+                            MMC_ERROR);
+        request.options_.emplace_back(std::move(tmpAllocOptions));
+    }
+    BatchAllocResponse allocResponse{};
+    MMC_RETURN_ERROR(metaNetClient_->SyncCall(request, allocResponse, rpcRetryTimeOut_), "batch put alloc failed");
+    // check alloc result
+    if (keys.size() != allocResponse.blobs_.size() || keys.size() != allocResponse.numBlobs_.size() ||
+        keys.size() != allocResponse.results_.size()) {
+        MMC_LOG_ERROR("Mismatch in number of keys and allocated blobs");
+        return MMC_ERROR;
+    }
+
+    gvas.resize(keys.size(), 0);
+    for (size_t i = 0; i < keys.size(); ++i) {
+        const std::string &key = keys[i];
+        const auto &blobs = allocResponse.blobs_[i];
+        const auto numBlobs = allocResponse.numBlobs_[i];
+        if (allocResponse.results_[i] != MMC_OK) {
+            // alloc has error, reserve alloc error code
+            if (allocResponse.results_[i] != MMC_DUPLICATED_OBJECT) {
+                MMC_LOG_ERROR("Alloc blob failed for key " << key << ", error code=" << allocResponse.results_[i]);
+            }
+            continue;
+        } else if (numBlobs == 0 || blobs.size() != numBlobs) {
+            MMC_LOG_ERROR("Invalid number of blobs" << numBlobs << " , " << blobs.size() << " for key " << key);
+            continue;
+        }
+
+        gvas[i] = blobs[0].gva_;
+    }
+    return MMC_OK;
+}
+
+Result MmcClientDefault::BatchCopy(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
+                                   const int32_t direct)
+{
+    MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
+    MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
+
+    Result ret = MMC_OK;
+    if (direct == SMEMB_COPY_L2G || direct == SMEMB_COPY_H2G) {
+        ret = bmProxy_->BatchDataPut(buffers, gvas, sizes, direct == SMEMB_COPY_L2G ? MEDIA_HBM : MEDIA_DRAM);
+        if (ret != MMC_OK) {
+            MMC_LOG_ERROR("put with direct " << direct << " failed, ret = " << ret);
+        }
+
+        BatchUpdateBlobRequest updateGva{};
+        for (auto &gva : gvas) {
+            updateGva.gvas_.push_back(reinterpret_cast<uint64_t>(gva));
+        }
+        updateGva.sizes_.assign(sizes.begin(), sizes.end());
+        updateGva.actionResults_.assign(updateGva.sizes_.size(), ret == MMC_OK ? MMC_WRITE_OK : MMC_WRITE_FAIL);
+        AsyncUpdateBlobByGva(updateGva); // 此处实现采用异步更新，是为了极致性能
+        return ret;
+    } else if (direct == SMEMB_COPY_G2L || direct == SMEMB_COPY_G2H) {
+        return bmProxy_->BatchDataGet(gvas, buffers, sizes, direct == SMEMB_COPY_G2L ? MEDIA_HBM : MEDIA_DRAM);
+    }
+    MMC_LOG_ERROR("Invalid direct " << direct << " for batch copy, nums:" << sizes.size());
+    return MMC_ERROR;
 }
 
 } // namespace mmc
