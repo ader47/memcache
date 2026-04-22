@@ -88,15 +88,12 @@ TEST(TestMmcIntervalMap, OverlapRejection)
 
     // 确认相邻区间独立存在，不合并
     auto q = im.Query(199);
-    ASSERT_TRUE(q.has_value());
     EXPECT_EQ(*q, "A");
 
     q = im.Query(200);
-    ASSERT_TRUE(q.has_value());
     EXPECT_EQ(*q, "G");
 
     q = im.Query(0);
-    ASSERT_TRUE(q.has_value());
     EXPECT_EQ(*q, "H");
 }
 
@@ -113,7 +110,7 @@ TEST(TestMmcIntervalMap, EdgeCasesAndInvalidInputs)
     // 非常大的地址（接近 uint64_t 边界）
     ASSERT_FALSE(im.Add(0xFFFFFFFFFFFFFF00ULL, 0x100, "high"));  // 翻转应该失败
     auto q = im.Query(0xFFFFFFFFFFFFFF50ULL);
-    ASSERT_FALSE(q.has_value());
+    EXPECT_EQ(q, nullptr);
 
     // 负数地址（如果你的实现允许 signed → unsigned 转换，这里测试 uint64_t 语义）
     // uint64_t 下 -1 会变成很大值，通常不应允许负数地址
@@ -239,7 +236,7 @@ TEST(TestMmcIntervalMap, AdjacentButDifferentValue)
 
 TEST(IntervalMapDeleteTest, RemoveExactMatch)
 {
-    IntervalMap<std::string> im;
+    MmcIntervalMap<std::string> im;
     im.Add(1000, 4096, "page1");
     im.Add(8192, 8192, "page2");
 
@@ -252,7 +249,7 @@ TEST(IntervalMapDeleteTest, RemoveExactMatch)
 
 TEST(IntervalMapDeleteTest, RemoveExactOnly)
 {
-    IntervalMap<std::string> im;
+    MmcIntervalMap<std::string> im;
     im.Add(0, 100, "A");
     im.Add(100, 200, "B");
 
@@ -267,7 +264,7 @@ TEST(IntervalMapDeleteTest, RemoveExactOnly)
 
 TEST(IntervalMapDeleteTest, RemoveAt)
 {
-    IntervalMap<std::string> im;
+    MmcIntervalMap<std::string> im;
     im.Add(200, 300, "region");
 
     EXPECT_TRUE(im.RemoveAt(250));
