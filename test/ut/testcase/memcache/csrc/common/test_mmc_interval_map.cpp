@@ -44,18 +44,18 @@ TEST(TestMmcIntervalMap, BasicInsertAndQuery)
     im.Add(200, 80, "data");   // [200, 280)
     im.Add(300, 100, "stack"); // [300, 400)
 
-    EXPECT_EQ(im.Query(90), std::nullopt);
-    EXPECT_EQ(im.Query(100), "code");
-    EXPECT_EQ(im.Query(149), "code");
-    EXPECT_EQ(im.Query(150), std::nullopt);
-    EXPECT_EQ(im.Query(199), std::nullopt);
-    EXPECT_EQ(im.Query(200), "data");
-    EXPECT_EQ(im.Query(279), "data");
-    EXPECT_EQ(im.Query(280), std::nullopt);
-    EXPECT_EQ(im.Query(350), "stack");
-    EXPECT_EQ(im.Query(399), "stack");
-    EXPECT_EQ(im.Query(400), std::nullopt);
-    EXPECT_EQ(im.Query(1000), std::nullopt);
+    EXPECT_EQ(im.Query(90), nullptr);
+    EXPECT_EQ(*im.Query(100), "code");
+    EXPECT_EQ(*im.Query(149), "code");
+    EXPECT_EQ(im.Query(150), nullptr);
+    EXPECT_EQ(im.Query(199), nullptr);
+    EXPECT_EQ(*im.Query(200), "data");
+    EXPECT_EQ(*im.Query(279), "data");
+    EXPECT_EQ(im.Query(280), nullptr);
+    EXPECT_EQ(*im.Query(350), "stack");
+    EXPECT_EQ(*im.Query(399), "stack");
+    EXPECT_EQ(im.Query(400), nullptr);
+    EXPECT_EQ(im.Query(1000), nullptr);
 }
 
 // ------------------------------------------------------------------------
@@ -123,14 +123,14 @@ TEST(TestMmcIntervalMap, EdgeCasesAndInvalidInputs)
 
     // 查询边界点
     im.Add(1000, 1, "single");  // [1000, 1001)
-    EXPECT_EQ(im.Query(999), std::nullopt);
-    EXPECT_EQ(im.Query(1000), "single");
-    EXPECT_EQ(im.Query(1001), std::nullopt);
+    EXPECT_EQ(im.Query(999), nullptr);
+    EXPECT_EQ(*im.Query(1000), "single");
+    EXPECT_EQ(im.Query(1001), nullptr);
 
     // 空 map
     MmcIntervalMap<std::string> empty_map;
-    EXPECT_EQ(empty_map.Query(0), std::nullopt);
-    EXPECT_EQ(empty_map.Query(123456789012345ULL), std::nullopt);
+    EXPECT_EQ(empty_map.Query(0), nullptr);
+    EXPECT_EQ(empty_map.Query(123456789012345ULL), nullptr);
 }
 
 // ------------------------------------------------------------------------
@@ -141,14 +141,14 @@ TEST(TestMmcIntervalMap, SingleIntervalFullyCovered)
     MmcIntervalMap<std::string> im;
     im.Add(100, 200, "regionA"); // [100, 300)
 
-    EXPECT_EQ(im.Query(120, 40), "regionA");  // 完全在內部
-    EXPECT_EQ(im.Query(100, 200), "regionA"); // 從起點開始
-    EXPECT_EQ(im.Query(299, 1), "regionA");   // 最後一個位元組
-    EXPECT_EQ(im.Query(100, 200), "regionA"); // 正好整段
+    EXPECT_EQ(*im.Query(120, 40), "regionA");  // 完全在內部
+    EXPECT_EQ(*im.Query(100, 200), "regionA"); // 從起點開始
+    EXPECT_EQ(*im.Query(299, 1), "regionA");   // 最後一個位元組
+    EXPECT_EQ(*im.Query(100, 200), "regionA"); // 正好整段
 
-    EXPECT_EQ(im.Query(99, 10), std::nullopt);  // 左邊超出
-    EXPECT_EQ(im.Query(250, 60), std::nullopt); // 右邊超出
-    EXPECT_EQ(im.Query(120, 0), std::nullopt);  // size=0
+    EXPECT_EQ(im.Query(99, 10), nullptr);  // 左邊超出
+    EXPECT_EQ(im.Query(250, 60), nullptr); // 右邊超出
+    EXPECT_EQ(im.Query(120, 0), nullptr);  // size=0
 }
 
 // ------------------------------------------------------------------------
@@ -161,12 +161,12 @@ TEST(TestMmcIntervalMap, MultipleAdjacentSameValue)
     im.Add(100, 150, "code"); // [100,250)
     im.Add(250, 50, "code");  // [250,300)
 
-    EXPECT_EQ(im.Query(0, 300), "code");  // 完整三段
-    EXPECT_EQ(im.Query(50, 180), "code"); // 跨越前兩段
-    EXPECT_EQ(im.Query(240, 40), "code"); // 跨越最後兩段的交界
+    EXPECT_EQ(*im.Query(0, 300), "code");  // 完整三段
+    EXPECT_EQ(*im.Query(50, 180), "code"); // 跨越前兩段
+    EXPECT_EQ(*im.Query(240, 40), "code"); // 跨越最後兩段的交界
 
-    EXPECT_EQ(im.Query(0, 301), std::nullopt); // 多出一個位元組
-    EXPECT_EQ(im.Query(90, 180), "code");      // 從第一段中間到第三段中間
+    EXPECT_EQ(im.Query(0, 301), nullptr); // 多出一個位元組
+    EXPECT_EQ(*im.Query(90, 180), "code");      // 從第一段中間到第三段中間
 }
 
 // ------------------------------------------------------------------------
@@ -181,15 +181,15 @@ TEST(TestMmcIntervalMap, DifferentValueOrGapShouldFail)
     im.Add(350, 100, "B"); // [350,450)
 
     // 值相同但有空洞
-    EXPECT_EQ(im.Query(50, 250), std::nullopt);  // 中间一段[200, 250]是空洞
-    EXPECT_EQ(im.Query(180, 120), std::nullopt); // 中间一段[200, 250]是空洞
+    EXPECT_EQ(im.Query(50, 250), nullptr);  // 中间一段[200, 250]是空洞
+    EXPECT_EQ(im.Query(180, 120), nullptr); // 中间一段[200, 250]是空洞
 
     // 值不同
-    EXPECT_EQ(im.Query(180, 200), std::nullopt); // 有空洞且值不同
-    EXPECT_EQ(im.Query(300, 100), std::nullopt); //  A → B
+    EXPECT_EQ(im.Query(180, 200), nullptr); // 有空洞且值不同
+    EXPECT_EQ(im.Query(300, 100), nullptr); //  A → B
 
     // 部分覆蓋
-    EXPECT_EQ(im.Query(260, 50), "A"); // [260,310) 只覆蓋一部分 A
+    EXPECT_EQ(*im.Query(260, 50), "A"); // [260,310) 只覆蓋一部分 A
 }
 
 // ------------------------------------------------------------------------
@@ -202,25 +202,25 @@ TEST(TestMmcIntervalMap, BoundaryAndExtremeCases)
     im.Add(1000000000000ULL, 1, "big"); // 大地址單點
 
     // 單點區間
-    EXPECT_EQ(im.Query(0, 1), "single");
-    EXPECT_EQ(im.Query(0, 2), std::nullopt);
+    EXPECT_EQ(*im.Query(0, 1), "single");
+    EXPECT_EQ(im.Query(0, 2), nullptr);
 
     // 大地址
     uint64_t base = 1000000000000ULL;
-    EXPECT_EQ(im.Query(base, 1), "big");
-    EXPECT_EQ(im.Query(base - 1, 1), std::nullopt);
-    EXPECT_EQ(im.Query(base, 2), std::nullopt);
+    EXPECT_EQ(*im.Query(base, 1), "big");
+    EXPECT_EQ(im.Query(base - 1, 1), nullptr);
+    EXPECT_EQ(im.Query(base, 2), nullptr);
 
     // size 很大但實際只覆蓋一點
-    EXPECT_EQ(im.Query(base, 10000000000ULL), std::nullopt);
+    EXPECT_EQ(im.Query(base, 10000000000ULL), nullptr);
 
     // 空 map
     MmcIntervalMap<std::string> empty;
-    EXPECT_EQ(empty.Query(0, 100), std::nullopt);
-    EXPECT_EQ(empty.Query(123456789012345ULL, 1), std::nullopt);
+    EXPECT_EQ(empty.Query(0, 100), nullptr);
+    EXPECT_EQ(empty.Query(123456789012345ULL, 1), nullptr);
 
     // size = 0
-    EXPECT_EQ(im.Query(500, 0), std::nullopt);
+    EXPECT_EQ(im.Query(500, 0), nullptr);
 }
 
 // ------------------------------------------------------------------------
@@ -232,9 +232,9 @@ TEST(TestMmcIntervalMap, AdjacentButDifferentValue)
     im.Add(0, 100, "left");
     im.Add(100, 100, "right");
 
-    EXPECT_EQ(im.Query(50, 100), std::nullopt); // 跨越 left → right，值不同
-    EXPECT_EQ(im.Query(0, 100), "left");
-    EXPECT_EQ(im.Query(100, 100), "right");
+    EXPECT_EQ(im.Query(50, 100), nullptr); // 跨越 left → right，值不同
+    EXPECT_EQ(*im.Query(0, 100), "left");
+    EXPECT_EQ(*im.Query(100, 100), "right");
 }
 
 TEST(IntervalMapDeleteTest, RemoveExactMatch)
@@ -244,8 +244,8 @@ TEST(IntervalMapDeleteTest, RemoveExactMatch)
     im.Add(8192, 8192, "page2");
 
     EXPECT_TRUE(im.Remove(1000, 4096));
-    EXPECT_EQ(im.Query(1000), std::nullopt);
-    EXPECT_EQ(im.Query(5000), std::nullopt);
+    EXPECT_EQ(im.Query(1000), nullptr);
+    EXPECT_EQ(im.Query(5000), nullptr);
 
     EXPECT_FALSE(im.Remove(1000, 4096)); // 已刪除
 }
@@ -271,9 +271,9 @@ TEST(IntervalMapDeleteTest, RemoveAt)
     im.Add(200, 300, "region");
 
     EXPECT_TRUE(im.RemoveAt(250));
-    EXPECT_EQ(im.Query(250), std::nullopt);
-    EXPECT_EQ(im.Query(199), std::nullopt);
-    EXPECT_EQ(im.Query(500), std::nullopt);
+    EXPECT_EQ(im.Query(250), nullptr);
+    EXPECT_EQ(im.Query(199), nullptr);
+    EXPECT_EQ(im.Query(500), nullptr);
 
     EXPECT_FALSE(im.RemoveAt(250)); // 已刪除
     EXPECT_FALSE(im.RemoveAt(150)); // 本來就不存在

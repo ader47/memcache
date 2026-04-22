@@ -74,48 +74,48 @@ public:
         return true;
     }
 
-    std::optional<V> Query(uint64_t addr) const
+    V* Query(uint64_t addr)
     {
         // 找到第一个 start > addr 的区间 → 前一个可能是包含 addr 的
         auto it = intervals_.upper_bound(addr);
         if (it == intervals_.begin()) {
-            return std::nullopt;
+            return nullptr;
         }
         --it;
 
         if (it->first <= addr && addr < it->second.first) {
-            return it->second.second;
+            return &(it->second.second);
         }
 
-        return std::nullopt;
+        return nullptr;
     }
 
     // 范围查询：整个 [addr, addr+size) 是否被同一个值完全覆盖
-    std::optional<V> Query(uint64_t addr, uint64_t size) const
+    V* Query(uint64_t addr, uint64_t size)
     {
         if (size == 0) {
-            return std::nullopt;
+            return nullptr;
         }
 
         uint64_t end = addr + size;
         if (end < addr) {
-            return std::nullopt;
+            return nullptr;
         }
 
         // 找到第一个可能覆盖 addr 的区间（≤ addr 的最大 start）
         auto it = intervals_.upper_bound(addr);
         if (it == intervals_.begin()) {
-            return std::nullopt; // 没有任何区间在 addr 之前
+            return nullptr; // 没有任何区间在 addr 之前
         }
         --it;
 
         // 如果当前区间甚至不覆盖 addr → 失败
         if (!(it->first <= addr && addr < it->second.first)) {
-            return std::nullopt;
+            return nullptr;
         }
 
         // 记录第一个区间的 value，作为基准
-        V common_value = it->second.second;
+        V* common_value = &(it->second.second);
 
         // 从 addr 开始检查，直到覆盖到 end
         uint64_t covered_up_to = addr;
@@ -123,12 +123,12 @@ public:
         while (covered_up_to < end) {
             // 当前区间必须包含 covered_up_to
             if (!(it->first <= covered_up_to && covered_up_to < it->second.first)) {
-                return std::nullopt; // 有空洞
+                return nullptr; // 有空洞
             }
 
             // value 必须相同
-            if (!equalFn_(it->second.second, common_value)) {
-                return std::nullopt;
+            if (!equalFn_(it->second.second, *common_value)) {
+                return nullptr;
             }
 
             // 前进到当前区间的结束位置
@@ -139,12 +139,12 @@ public:
 
             // 如果已经到达 map 末尾，但还没覆盖完 → 有空洞
             if (it == intervals_.end()) {
-                return (covered_up_to >= end) ? std::optional<V>{common_value} : std::nullopt;
+                return (covered_up_to >= end) ? common_value : nullptr;
             }
         }
 
         // 如果走完循环，covered_up_to >= end，且所有 value 相同
-        return std::optional<V>{common_value};
+        return common_value;
     }
 
     // 1. 完整区间刪除：必須完全匹配某个已存在的 [start, start+size)
