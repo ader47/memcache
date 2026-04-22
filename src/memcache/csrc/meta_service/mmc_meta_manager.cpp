@@ -233,50 +233,54 @@ Result MmcMetaManager::UpdateState(const std::string &key, const MmcLocation &lo
 
 Result MmcMetaManager::UpdateBlobState(const uint64_t gva, const uint64_t size, const BlobActionResult &actRet)
 {
-    std::optional<GvaMapInfo> gvaInfo = std::nullopt;
-    {
-        std::unique_lock<std::mutex> guard(gvaMutex_);
-        gvaInfo = gva2updateMap_.Query(gva, size);
-    }
-    if (gvaInfo == std::nullopt) {
+    std::unique_lock<std::mutex> gvaGuard(gvaMutex_);
+    GvaMapInfo *gvaInfo = gva2updateMap_.Query(gva, size);
+    if (gvaInfo == nullptr) {
         MMC_LOG_ERROR("query interval failed, gva:" << gva << ", size:" << size);
         return MMC_ERROR;
     }
-    MmcMemObjMetaPtr metaObj = nullptr;
+
     auto key = gvaInfo->key_;
+    uint32_t opRankId = GetRankIdByOperateId(gvaInfo->operateId_);
+    uint32_t opSeq = GetSequenceByOperateId(gvaInfo->operateId_);
+    MmcMemBlobPtr blobPtr = gvaInfo->blob_;
+
     if (actRet == MMC_WRITE_FAIL) {
+        gva2updateMap_.RemoveAt(gva); // lease是否联动删除??
+        gvaGuard.unlock();            // 先解锁
+
         ret = Remove(key);
         if (ret != MMC_OK) {
             MMC_LOG_ERROR("UpdateBlobState: Failed remove key " << key << ", ret: " << ret);
         }
-
-        std::unique_lock<std::mutex> gvaGuard(gvaMutex_);
-        gva2updateMap_.RemoveAt(gva); // lease是否联动删除？？
         return ret;
     }
 
     if (!gvaInfo->Fill(gva, size)) {
         return MMC_OK; // 未填满，不更新
     }
+    gvaGuard.unlock(); // 先解锁
 
     // when update state, do not update the lru
+    MmcMemObjMetaPtr metaObj = nullptr;
     Result ret = metaContainer_->Get(key, metaObj);
     if (ret != MMC_OK || metaObj == nullptr) {
+        std::unique_lock<std::mutex> tmpGuard1(gvaMutex_);
+        gva2updateMap_.RemoveAt(gva);
         MMC_LOG_ERROR("UpdateState: Cannot find " << key << " memObjMeta! ret:" << ret
                                                   << ", action:" << static_cast<uint32_t>(actRet));
         return MMC_UNMATCHED_KEY;
     }
-    uint32_t opRankId = GetRankIdByOperateId(gvaInfo->operateId_);
-    uint32_t opSeq = GetSequenceByOperateId(gvaInfo->operateId_);
-    std::unique_lock<std::mutex> guard(metaObj->Mutex());
-    ret = gvaInfo->blob_->UpdateState(key, opRankId, opSeq, actRet);
-    guard.unlock(); // 必须释放锁，否则在 Remove 调用中会死锁
+
+    std::unique_lock<std::mutex> metaGuard(metaObj->Mutex());
+    ret = blobPtr->UpdateState(key, opRankId, opSeq, actRet);
+    metaGuard.unlock(); // 必须释放锁，否则在 Remove 调用中会死锁
     if (ret != MMC_OK) {
         MMC_LOG_ERROR("failed to update gva:" << gva << ", size: " << size << ", key:" << key << " with " << actRet
                                               << ", ret:" << ret);
     }
 
-    std::unique_lock<std::mutex> gvaGuard(gvaMutex_);
+    std::unique_lock<std::mutex> tmpGuard2(gvaMutex_);
     gva2updateMap_.RemoveAt(gva);
     return ret;
 }
