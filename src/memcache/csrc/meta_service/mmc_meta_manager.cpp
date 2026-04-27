@@ -289,7 +289,12 @@ void MmcMetaManager::PushRemoveList(const std::string &key, const MmcMemObjMetaP
     auto future = threadPool_->Enqueue(
         [&](const std::string keyL, const MmcMemObjMetaPtr metaL, MmcGlobalAllocatorPtr allocator) {
             std::unique_lock<std::mutex> guard(metaL->Mutex());
-            return metaL->FreeBlobs(keyL, allocator);
+            auto blobs = metaL->FreeBlobs(keyL, allocator);
+            std::unique_lock<std::mutex> tmpGuard1(gvaMutex_);
+            for (auto &blob : blobs) {
+                gva2updateMap_.RemoveAt(blob->Gva());
+            }
+            return MMC_OK;
         },
         key, meta, globalAllocator_);
 
@@ -297,14 +302,10 @@ void MmcMetaManager::PushRemoveList(const std::string &key, const MmcMemObjMetaP
     if (!future.valid()) {
         // already locked when call, no need lock again
         blobs = meta->FreeBlobs(key, globalAllocator_);
-    } else {
-        blobs = future.get();
-    }
-
-    // blob 释放，要反向移除掉加入的gva，避免泄漏
-    std::unique_lock<std::mutex> tmpGuard1(gvaMutex_);
-    for (auto &blob : blobs) {
-        gva2updateMap_.RemoveAt(blob->Gva());
+        std::unique_lock<std::mutex> tmpGuard1(gvaMutex_); // 这里这一步在meta锁内操作，是否会有ABA问题？
+        for (auto &blob : blobs) {
+            gva2updateMap_.RemoveAt(blob->Gva());
+        }
     }
 }
 

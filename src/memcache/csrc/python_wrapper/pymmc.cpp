@@ -795,7 +795,7 @@ PYBIND11_MODULE(_pymmc, m)
                 py::gil_scoped_release release;
                 return self.BatchMalloc(keys, sizes, media);
             },
-            py::arg("keys"), py::arg("sizes"), py::arg("media") = MEDIA_DRAM)
+            py::arg("keys"), py::arg("sizes"), py::arg("media") = 1) // MEDIA_DRAM
         .def(
             "batch_copy",
             [](MmcacheStore &self, const std::vector<uintptr_t> &gva_ptrs, const std::vector<uintptr_t> &buffer_ptrs,
