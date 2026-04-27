@@ -159,7 +159,9 @@ Result MmcMetaManager::Alloc(const std::string &key, const AllocOptions &allocOp
         if (ret != MMC_DUPLICATED_OBJECT) {
             MMC_LOG_ERROR("Fail to insert " << key << " into MmcMetaContainer. ret:" << ret);
         }
-    } else {
+    }
+
+    if (ret == MMC_OK || (ret == MMC_DUPLICATED_OBJECT && (allocOpt.flags_ & ALLOC_FLAGS_GVA_MALLOC_MASK))) {
         std::unique_lock<std::mutex> guard(tempMetaObj->Mutex());
         objMeta.prot_ = tempMetaObj->Prot();
         objMeta.priority_ = tempMetaObj->Priority();
@@ -264,8 +266,8 @@ Result MmcMetaManager::UpdateBlobState(const uint64_t gva, const uint64_t size, 
     if (ret != MMC_OK || metaObj == nullptr) {
         std::unique_lock<std::mutex> tmpGuard1(gvaMutex_);
         gva2updateMap_.RemoveAt(gva);
-        MMC_LOG_ERROR("UpdateState: Cannot find " << key << " memObjMeta! ret:" << ret
-                                                  << ", action:" << static_cast<uint32_t>(actRet));
+        MMC_LOG_ERROR("UpdateState: Cannot find " << key << " memObjMeta! ret:" << ret << ", action:" << actRet
+                                                  << ", gva:" << gva << ", size:" << size);
         return MMC_UNMATCHED_KEY;
     }
 
