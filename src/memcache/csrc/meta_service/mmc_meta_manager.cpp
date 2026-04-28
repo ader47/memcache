@@ -161,6 +161,16 @@ Result MmcMetaManager::Alloc(const std::string &key, const AllocOptions &allocOp
         }
     }
 
+    // 重复插入，且是GVA_MALLOC场景，需要重新获取meta对象
+    if (ret == MMC_DUPLICATED_OBJECT && (allocOpt.flags_ & ALLOC_FLAGS_GVA_MALLOC_MASK)) {
+        tempMetaObj = nullptr;
+        auto repRet = metaContainer_->Get(key, tempMetaObj);
+        if (repRet != MMC_OK || tempMetaObj == nullptr) {
+            MMC_LOG_ERROR("Unexcept error! key: " << key << " not find in MmcMetaContainer. ret:" << repRet);
+            ret = MMC_ERROR;
+        }
+    }
+
     if (ret == MMC_OK || (ret == MMC_DUPLICATED_OBJECT && (allocOpt.flags_ & ALLOC_FLAGS_GVA_MALLOC_MASK))) {
         std::unique_lock<std::mutex> guard(tempMetaObj->Mutex());
         objMeta.prot_ = tempMetaObj->Prot();
@@ -168,8 +178,9 @@ Result MmcMetaManager::Alloc(const std::string &key, const AllocOptions &allocOp
         objMeta.size_ = tempMetaObj->Size();
         tempMetaObj->GetBlobsDesc(objMeta.blobs_);
         objMeta.numBlobs_ = objMeta.blobs_.size();
-
-        if (allocOpt.flags_ & ALLOC_FLAGS_GVA_MALLOC_MASK) {
+        // GVA_MALLOC场景，需要将对象的GVA信息记录下来，用于后续更新GVA信息
+        // 但是重复key不需要重复记录了
+        if ((allocOpt.flags_ & ALLOC_FLAGS_GVA_MALLOC_MASK) && ret != MMC_DUPLICATED_OBJECT) {
             for (auto &blob : blobs) {
                 GvaMapInfo mapInfo{};
                 mapInfo.key_ = key;
