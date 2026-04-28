@@ -250,7 +250,7 @@ Result MmcMetaManager::UpdateBlobState(const uint64_t gva, const uint64_t size, 
     GvaMapInfo *gvaInfo = gva2updateMap_.Query(gva, size);
     if (gvaInfo == nullptr) {
         MMC_LOG_DEBUG("query interval failed, gva:" << gva << ", size:" << size);
-        return MMC_ERROR;
+        return MMC_OK;
     }
 
     auto key = gvaInfo->key_;
