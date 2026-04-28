@@ -249,7 +249,7 @@ Result MmcMetaManager::UpdateBlobState(const uint64_t gva, const uint64_t size, 
     std::unique_lock<std::mutex> gvaGuard(gvaMutex_);
     GvaMapInfo *gvaInfo = gva2updateMap_.Query(gva, size);
     if (gvaInfo == nullptr) {
-        MMC_LOG_ERROR("query interval failed, gva:" << gva << ", size:" << size);
+        MMC_LOG_DEBUG("query interval failed, gva:" << gva << ", size:" << size);
         return MMC_ERROR;
     }
 
