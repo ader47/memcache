@@ -193,6 +193,10 @@ Result MmcMetaManager::Alloc(const std::string &key, const AllocOptions &allocOp
                 }
             }
         }
+
+        if ((allocOpt.flags_ & ALLOC_FLAGS_GVA_MALLOC_MASK)) {
+            ret = MMC_OK;
+        }
     }
     TP_TRACE_END(TP_MMC_META_ALLOC, ret);
     return ret;
