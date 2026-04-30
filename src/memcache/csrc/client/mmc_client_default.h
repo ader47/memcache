@@ -138,7 +138,12 @@ private:
     void AsyncUpdateBlobByGva(BatchUpdateBlobRequest &updateRequest);
     std::future<int32_t> SubmitPutTask(BatchCopyDesc &copyDesc, MediaType mediaType, bool asyncExec);
     std::future<int32_t> SubmitGetTask(BatchCopyDesc &copyDesc, MediaType mediaType, bool asyncExec);
-
+    Result BatchDataOperation(const std::vector<void *> &gvas, const std::vector<void *> &buffers,
+                              const std::vector<size_t> &sizes, int32_t direct);
+    void NotifyUpdateBlobByGva(const std::vector<void *> &gvas, const std::vector<size_t> &sizes,
+                               Result operationResult);
+    Result ExecuteConcurrently(const std::vector<void *> &gvas, const std::vector<void *> &buffers,
+                               const std::vector<size_t> &sizes, bool isPut, MediaType mediaType, size_t chunkSize);
     // UBS IO相关数据结构
     struct UbsIoBatchGetData {
         const std::vector<std::string> &keys;

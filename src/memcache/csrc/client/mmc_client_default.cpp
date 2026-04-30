@@ -998,26 +998,131 @@ Result MmcClientDefault::BatchCopy(std::vector<void *> &gvas, std::vector<void *
     MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
-    Result ret = MMC_OK;
+    if (sizes.empty()) {
+        return MMC_OK;
+    }
+
     if (direct == SMEMB_COPY_L2G || direct == SMEMB_COPY_H2G) {
-        ret = bmProxy_->BatchDataPut(buffers, gvas, sizes, direct == SMEMB_COPY_L2G ? MEDIA_HBM : MEDIA_DRAM);
+        // Write 方向
+        Result putResult = BatchDataOperation(gvas, buffers, sizes, direct);
+        NotifyUpdateBlobByGva(gvas, sizes, putResult);
+        return putResult;
+    } else if (direct == SMEMB_COPY_G2L || direct == SMEMB_COPY_G2H) {
+        // Read 方向
+        return BatchDataOperation(gvas, buffers, sizes, direct);
+    }
+
+    MMC_LOG_ERROR("Invalid direct " << direct << " for batch copy, count:" << sizes.size());
+    return MMC_ERROR;
+}
+
+void MmcClientDefault::NotifyUpdateBlobByGva(const std::vector<void *> &gvas, const std::vector<size_t> &sizes,
+                                             Result operationResult)
+{
+    BatchUpdateBlobRequest updateGva{};
+    updateGva.gvas_.reserve(gvas.size());
+
+    for (auto gva : gvas) {
+        updateGva.gvas_.push_back(reinterpret_cast<uint64_t>(gva));
+    }
+
+    updateGva.sizes_ = sizes;
+    updateGva.actionResults_.assign(sizes.size(), (operationResult == MMC_OK ? MMC_WRITE_OK : MMC_WRITE_FAIL));
+
+    AsyncUpdateBlobByGva(std::move(updateGva));
+}
+
+Result MmcClientDefault::BatchDataOperation(const std::vector<void *> &gvas, const std::vector<void *> &buffers,
+                                            const std::vector<size_t> &sizes, int32_t direct)
+{
+    constexpr size_t kBatchChunkSize = 8ULL * 1024 * 1024; // 8MB
+    constexpr size_t kBatchChunkCount = 3;
+    constexpr size_t kMinBytesForConcurrency = kBatchChunkSize * kBatchChunkCount;
+
+    const bool isPut = (direct == SMEMB_COPY_L2G || direct == SMEMB_COPY_H2G);
+    const MediaType mediaType = (direct == SMEMB_COPY_L2G || direct == SMEMB_COPY_G2L) ? MEDIA_HBM : MEDIA_DRAM;
+
+    // 计算总数据量
+    size_t total_bytes = 0;
+    for (size_t s : sizes) {
+        total_bytes += s;
+    }
+
+    // 小数据量：直接一次性调用，不切片、不并发
+    if (total_bytes <= kMinBytesForConcurrency || sizes.size() <= kBatchChunkCount) {
+        Result ret = isPut ? bmProxy_->BatchDataPut(buffers, gvas, sizes, mediaType)
+                           : bmProxy_->BatchDataGet(gvas, buffers, sizes, mediaType);
+
         if (ret != MMC_OK) {
-            MMC_LOG_ERROR("put with direct " << direct << " failed, ret = " << ret);
+            MMC_LOG_ERROR((isPut ? "BatchDataPut" : "BatchDataGet")
+                          << " (small data, direct call) failed, direct=" << direct << ", ret=" << ret);
+        }
+        return ret;
+    }
+
+    // 大数据量：分片 + 并发执行
+    return ExecuteConcurrently(gvas, buffers, sizes, isPut, mediaType, kBatchChunkSize);
+}
+
+Result MmcClientDefault::ExecuteConcurrently(const std::vector<void *> &gvas, const std::vector<void *> &buffers,
+                                             const std::vector<size_t> &sizes, bool isPut, MediaType mediaType,
+                                             size_t chunkSize)
+{
+    const size_t total = sizes.size();
+    std::vector<std::future<Result>> futures;
+    futures.reserve(total);
+
+    size_t idx = 0;
+    while (idx < total) {
+        std::vector<void *> sub_gvas;
+        std::vector<void *> sub_buffers;
+        std::vector<size_t> sub_sizes;
+
+        size_t current_bytes = 0;
+        while (idx < total && current_bytes < chunkSize) {
+            const size_t this_size = sizes[idx];
+
+            sub_gvas.push_back(gvas[idx]);
+            sub_buffers.push_back(buffers[idx]);
+            sub_sizes.push_back(this_size);
+
+            current_bytes += this_size;
+            ++idx;
         }
 
-        BatchUpdateBlobRequest updateGva{};
-        for (auto &gva : gvas) {
-            updateGva.gvas_.push_back(reinterpret_cast<uint64_t>(gva));
+        if (sub_sizes.empty()) {
+            break;
         }
-        updateGva.sizes_.assign(sizes.begin(), sizes.end());
-        updateGva.actionResults_.assign(updateGva.sizes_.size(), ret == MMC_OK ? MMC_WRITE_OK : MMC_WRITE_FAIL);
-        AsyncUpdateBlobByGva(updateGva); // 此处实现采用异步更新，是为了极致性能
-        return ret;
-    } else if (direct == SMEMB_COPY_G2L || direct == SMEMB_COPY_G2H) {
-        return bmProxy_->BatchDataGet(gvas, buffers, sizes, direct == SMEMB_COPY_G2L ? MEDIA_HBM : MEDIA_DRAM);
+
+        // 提交任务到线程池
+        auto task = [this, sub_b = std::move(sub_buffers), sub_g = std::move(sub_gvas), sub_s = std::move(sub_sizes),
+                     mediaType, isPut]() mutable -> Result {
+            return isPut ? bmProxy_->BatchDataPut(sub_b, sub_g, sub_s, mediaType)
+                         : bmProxy_->BatchDataGet(sub_g, sub_b, sub_s, mediaType);
+        };
+
+        if (isPut) {
+            futures.emplace_back(writeThreadPool_->enqueue(std::move(task)));
+        } else {
+            futures.emplace_back(readThreadPool_->enqueue(std::move(task)));
+        }
     }
-    MMC_LOG_ERROR("Invalid direct " << direct << " for batch copy, nums:" << sizes.size());
-    return MMC_ERROR;
+
+    // 等待所有并发任务完成
+    Result finalResult = MMC_OK;
+    for (auto &fut : futures) {
+        Result r = fut.get();
+        if (r != MMC_OK && finalResult == MMC_OK) {
+            finalResult = r;
+        }
+    }
+
+    if (finalResult != MMC_OK) {
+        MMC_LOG_ERROR((isPut ? "BatchDataPut" : "BatchDataGet")
+                      << " (concurrent) failed, direct=" << direct << ", ret=" << finalResult);
+    }
+
+    return finalResult;
 }
 
 } // namespace mmc
