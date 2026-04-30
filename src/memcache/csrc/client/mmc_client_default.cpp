@@ -1029,11 +1029,11 @@ void MmcClientDefault::NotifyUpdateBlobByGva(const std::vector<void *> &gvas, co
     updateGva.sizes_ = sizes;
     updateGva.actionResults_.assign(sizes.size(), (operationResult == MMC_OK ? MMC_WRITE_OK : MMC_WRITE_FAIL));
 
-    AsyncUpdateBlobByGva(std::move(updateGva));
+    AsyncUpdateBlobByGva(updateGva);
 }
 
-Result MmcClientDefault::BatchDataOperation(const std::vector<void *> &gvas, const std::vector<void *> &buffers,
-                                            const std::vector<size_t> &sizes, int32_t direct)
+Result MmcClientDefault::BatchDataOperation(std::vector<void *> &gvas, std::vector<void *> &buffers,
+                                            std::vector<size_t> &sizes, int32_t direct)
 {
     constexpr size_t kBatchChunkSize = 8ULL * 1024 * 1024; // 8MB
     constexpr size_t kBatchChunkCount = 3;
@@ -1102,9 +1102,9 @@ Result MmcClientDefault::ExecuteConcurrently(const std::vector<void *> &gvas, co
         };
 
         if (isPut) {
-            futures.emplace_back(writeThreadPool_->enqueue(std::move(task)));
+            futures.emplace_back(writeThreadPool_->Enqueue(std::move(task)));
         } else {
-            futures.emplace_back(readThreadPool_->enqueue(std::move(task)));
+            futures.emplace_back(readThreadPool_->Enqueue(std::move(task)));
         }
     }
 
@@ -1118,10 +1118,8 @@ Result MmcClientDefault::ExecuteConcurrently(const std::vector<void *> &gvas, co
     }
 
     if (finalResult != MMC_OK) {
-        MMC_LOG_ERROR((isPut ? "BatchDataPut" : "BatchDataGet")
-                      << " (concurrent) failed, direct=" << direct << ", ret=" << finalResult);
+        MMC_LOG_ERROR((isPut ? "BatchDataPut" : "BatchDataGet") << " (concurrent) failed, ret=" << finalResult);
     }
-
     return finalResult;
 }
 
