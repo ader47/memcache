@@ -21,36 +21,6 @@
 
 template<typename V = std::string, typename ValueEqual = std::equal_to<V>>
 class MmcIntervalMap {
-private:
-    // key = start, value = {end, mapped_value}
-    std::map<uint64_t, std::pair<uint64_t, V>> intervals_;
-    ValueEqual equalFn_;
-
-    // 检查新区间 [start, end) 是否与已有区间重叠
-    bool HasOverlap(uint64_t start, uint64_t end) const
-    {
-        // 找到第一个 >= start 的区间
-        auto it = intervals_.lower_bound(start);
-
-        // 检查前一个区间是否覆盖到 start
-        if (it != intervals_.begin()) {
-            auto prev = std::prev(it);
-            if (prev->second.first > start) {
-                return true; // 前一个区间右端 > 新区间起点 → 重叠
-            }
-        }
-
-        // 检查后续区间是否与新区间有交集
-        while (it != intervals_.end() && it->first < end) {
-            if (it->first < end && start < it->second.first) {
-                return true;
-            }
-            ++it;
-        }
-
-        return false;
-    }
-
 public:
     explicit MmcIntervalMap(ValueEqual eq = ValueEqual{}) : equalFn_(std::move(eq)) {}
 
@@ -203,6 +173,35 @@ public:
     void Clear()
     {
         intervals_.clear();
+    }
+
+private:
+    // key = start, value = {end, mapped_value}
+    std::map<uint64_t, std::pair<uint64_t, V>> intervals_;
+    ValueEqual equalFn_;
+
+    // 检查新区间 [start, end) 是否与已有区间重叠
+    bool HasOverlap(uint64_t start, uint64_t end) const
+    {
+        // 找到第一个 >= start 的区间
+        auto it = intervals_.lower_bound(start);
+        // 检查前一个区间是否覆盖到 start
+        if (it != intervals_.begin()) {
+            auto prev = std::prev(it);
+            if (prev->second.first > start) {
+                return true; // 前一个区间右端 > 新区间起点 → 重叠
+            }
+        }
+
+        // 检查后续区间是否与新区间有交集
+        while (it != intervals_.end() && it->first < end) {
+            if (it->first < end && start < it->second.first) {
+                return true;
+            }
+            ++it;
+        }
+
+        return false;
     }
 };
 

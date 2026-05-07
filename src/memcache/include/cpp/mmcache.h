@@ -66,7 +66,7 @@ public:
     void AddGva(uint64_t gva)
     {
         gva_.emplace_back(gva);
-    }    
+    }
 
     std::string ToString() const
     {

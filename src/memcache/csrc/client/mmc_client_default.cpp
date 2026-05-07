@@ -1052,7 +1052,6 @@ Result MmcClientDefault::BatchDataOperation(std::vector<void *> &gvas, std::vect
     if (total_bytes <= kMinBytesForConcurrency || sizes.size() <= kBatchChunkCount) {
         Result ret = isPut ? bmProxy_->BatchDataPut(buffers, gvas, sizes, mediaType)
                            : bmProxy_->BatchDataGet(gvas, buffers, sizes, mediaType);
-
         if (ret != MMC_OK) {
             MMC_LOG_ERROR((isPut ? "BatchDataPut" : "BatchDataGet")
                           << " (small data, direct call) failed, direct=" << direct << ", ret=" << ret);

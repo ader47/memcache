@@ -268,7 +268,7 @@ private:
         std::string key_{};
         uint64_t operateId_{0};
         MmcMemBlobPtr blob_;
-        std::map<size_t, size_t> ranges; // key: start, value: end
+        std::map<size_t, size_t> ranges_; // key: start, value: end
 
         bool Fill(size_t start, size_t fillSize)
         {
@@ -281,34 +281,33 @@ private:
 
             size_t absStart = std::max(start, gva);
             size_t absEnd = std::min(start + fillSize, gva + size);
-
             if (absStart >= absEnd) {
                 return false;
             }
 
             // 找到第一个可能重叠的区间
-            auto it = ranges.upper_bound(absStart);
-            if (it != ranges.begin()) {
+            auto it = ranges_.upper_bound(absStart);
+            if (it != ranges_.begin()) {
                 auto prevIt = std::prev(it);
                 if (prevIt->second >= absStart) {
                     // 与前一个区间重叠
                     absStart = std::min(absStart, prevIt->first);
                     absEnd = std::max(absEnd, prevIt->second);
-                    it = ranges.erase(prevIt);
+                    it = ranges_.erase(prevIt);
                 }
             }
 
             // 合并后续重叠的区间
-            while (it != ranges.end() && it->first <= absEnd) {
+            while (it != ranges_.end() && it->first <= absEnd) {
                 absEnd = std::max(absEnd, it->second);
-                it = ranges.erase(it);
+                it = ranges_.erase(it);
             }
 
             // 插入合并后的区间
-            ranges[absStart] = absEnd;
+            ranges_[absStart] = absEnd;
 
             // 检查是否完全填满
-            return (ranges.size() == 1 && ranges.begin()->first == gva && ranges.begin()->second == gva + size);
+            return (ranges_.size() == 1 && ranges_.begin()->first == gva && ranges_.begin()->second == gva + size);
         }
 
         bool operator==(const GvaMapInfo &other) const
