@@ -11,7 +11,6 @@
 # See the Mulan PSL v2 for more details.
 
 import time
-import datetime
 import sys
 import unittest
 import multiprocessing
@@ -22,25 +21,18 @@ import torch
 import torch_npu
 
 
-def log_print(message):
-    # 获取当前时间，增加日志的可读性
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    formatted_message = f"{timestamp} {message}"
-    print(formatted_message)
-
-
 # 启动 MetaService 在后台线程中运行
 def start_meta_service():
     try:
         MetaService.main()
     except Exception as e:
-        log_print(f"MetaService 出错: {e}")
+        print(f"MetaService 出错: {e}")
 
 
 # 启动子进程执行阻塞函数 xxx
 proc = multiprocessing.Process(target=start_meta_service)
 proc.start()
-log_print(f"子进程已启动，PID: {proc.pid}")
+print(f"子进程已启动，PID: {proc.pid}")
 time.sleep(3)
 
 
@@ -49,17 +41,17 @@ class TestExample(unittest.TestCase):
     original_data = b"some data!"
 
     def setUp(self):
-        log_print("开始执行测试...")
+        print("开始执行测试...")
         acl.init()
         device_id = 3
         ret = acl.rt.set_device(device_id)
-        log_print(f"set_device {device_id} returned: {ret}")
+        print(f"set_device {device_id} returned: {ret}")
         self._distributed_object_store = DistributedObjectStore()
         res = self._distributed_object_store.init(device_id)
         self.assertEqual(res, 0)
 
     def test_1(self):
-        log_print("------------------------------ start ------------------------------")
+        print("------------------------------ start ------------------------------")
         keys = ["key1", "key2", "key3", "key4"]
         write_tensors = []
         read_tensors = []
@@ -93,12 +85,12 @@ class TestExample(unittest.TestCase):
             read_buffers.append(rts.data_ptr())
             read2_buffers.append(rts2.data_ptr())
             sizes.append(ts.element_size() * ts.nelement())
-            log_print(f"=========={ts.sum().item()=}, {rts.sum().item()=}, {rts2.sum().item()=}")
+            print(f"=========={ts.sum().item()=}, {rts.sum().item()=}, {rts2.sum().item()=}")
 
         
-        log_print(f"=========={sizes=}")
+        print(f"=========={sizes=}")
         gvas = self._distributed_object_store.batch_alloc(keys, sizes)
-        log_print(f"=========={gvas=}")
+        print(f"=========={gvas=}")
 
         time.sleep(5)
         ret = self._distributed_object_store.batch_copy(gvas, buffers, sizes, 0)
@@ -109,7 +101,7 @@ class TestExample(unittest.TestCase):
         self.assertEqual(ret, 0)
 
         for rd, wr in zip(read_tensors, write_tensors):
-            log_print(f"=========={wr.sum().item()=}, {rd.sum().item()=}")
+            print(f"=========={wr.sum().item()=}, {rd.sum().item()=}")
             self.assertEqual(rd.sum().item(), wr.sum().item())
 
 
@@ -117,23 +109,23 @@ class TestExample(unittest.TestCase):
         ret = self._distributed_object_store.batch_get_into(keys, read2_buffers, sizes, 1)
         self.assertEqual(ret, [0, 0, 0, 0])
         for rd, wr in zip(read2_tensors, write_tensors):
-            log_print(f"=========={wr.sum().item()=}, {rd.sum().item()=}")
+            print(f"=========={wr.sum().item()=}, {rd.sum().item()=}")
             self.assertEqual(rd.sum().item(), wr.sum().item())
 
-        log_print("----------------------------- over -------------------------------")
+        print("----------------------------- over -------------------------------")
 
 
     def tearDown(self):
         self._distributed_object_store.close()
-        log_print("object store destroyed")
-        log_print(f"测试完成，PID: {proc.pid}")
+        print("object store destroyed")
+        print(f"测试完成，PID: {proc.pid}")
         # 强制终止子进程
         if proc.is_alive():
-            log_print("正在终止子进程...")
+            print("正在终止子进程...")
             proc.terminate()
             proc.join(timeout=2)
             if proc.is_alive():
-                log_print("子进程未响应，强制杀死...")
+                print("子进程未响应，强制杀死...")
                 proc.kill()
                 proc.join()
 

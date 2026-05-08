@@ -265,8 +265,8 @@ private:
     MmcUbsIoProxyPtr ubsIoProxy_;
 
     struct GvaMapInfo {
-        std::string key_{};
-        uint64_t operateId_{0};
+        std::string key_;
+        uint64_t operateId_ = 0;
         MmcMemBlobPtr blob_;
         std::map<size_t, size_t> ranges_; // key: start, value: end
 
