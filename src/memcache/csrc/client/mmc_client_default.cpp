@@ -95,6 +95,8 @@ Result MmcClientDefault::Start(const mmc_client_config_t &config)
 
     metaNetClient_ = tmpNetClient;
     rpcRetryTimeOut_ = config.rpcRetryTimeOut;
+    batchChunkSize_ = config.batchChunkSize;
+    batchChunkCount_ = config.batchChunkCount;
     started_ = true;
     return MMC_OK;
 }
@@ -1035,9 +1037,7 @@ void MmcClientDefault::NotifyUpdateBlobByGva(const std::vector<void *> &gvas, co
 Result MmcClientDefault::BatchDataOperation(std::vector<void *> &gvas, std::vector<void *> &buffers,
                                             std::vector<size_t> &sizes, int32_t direct)
 {
-    constexpr size_t kBatchChunkSize = 8ULL * 1024 * 1024; // 8MB
-    constexpr size_t kBatchChunkCount = 3;
-    constexpr size_t kMinBytesForConcurrency = kBatchChunkSize * kBatchChunkCount;
+    size_t kMinBytesForConcurrency = batchChunkSize_ * batchChunkCount_;
 
     const bool isPut = (direct == SMEMB_COPY_L2G || direct == SMEMB_COPY_H2G);
     const MediaType mediaType = (direct == SMEMB_COPY_L2G || direct == SMEMB_COPY_G2L) ? MEDIA_HBM : MEDIA_DRAM;
@@ -1049,7 +1049,7 @@ Result MmcClientDefault::BatchDataOperation(std::vector<void *> &gvas, std::vect
     }
 
     // 小数据量：直接一次性调用，不切片、不并发
-    if (total_bytes <= kMinBytesForConcurrency || sizes.size() <= kBatchChunkCount) {
+    if (total_bytes <= kMinBytesForConcurrency || sizes.size() <= batchChunkCount_) {
         Result ret = isPut ? bmProxy_->BatchDataPut(buffers, gvas, sizes, mediaType)
                            : bmProxy_->BatchDataGet(gvas, buffers, sizes, mediaType);
         if (ret != MMC_OK) {
@@ -1060,7 +1060,7 @@ Result MmcClientDefault::BatchDataOperation(std::vector<void *> &gvas, std::vect
     }
 
     // 大数据量：分片 + 并发执行
-    return ExecuteConcurrently(gvas, buffers, sizes, isPut, mediaType, kBatchChunkSize);
+    return ExecuteConcurrently(gvas, buffers, sizes, isPut, mediaType, batchChunkSize_);
 }
 
 Result MmcClientDefault::ExecuteConcurrently(const std::vector<void *> &gvas, const std::vector<void *> &buffers,

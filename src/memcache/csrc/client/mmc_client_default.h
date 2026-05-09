@@ -175,6 +175,8 @@ private:
     bool aggregateIO_{false};
     size_t aggregateNum_{0};
     MmcThreadPoolPtr writeThreadPool_;
+    uint64_t batchChunkSize_ = 0;
+    uint32_t batchChunkCount_ = 0;
 };
 
 uint32_t MmcClientDefault::RankId(const affinity_policy &policy)

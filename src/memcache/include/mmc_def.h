@@ -95,6 +95,8 @@ typedef struct {
     mmc_tls_config tlsConfig;
     bool ubsIoEnable;
     char dataOpType[PROTOCOL_SIZE];
+    uint64_t batchChunkSize;
+    uint32_t batchChunkCount;
 } mmc_client_config_t;
 
 typedef struct {
