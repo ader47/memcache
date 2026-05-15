@@ -15,6 +15,7 @@
 #include "mmc_logger.h"
 #include "mmc_smem_bm_helper.h"
 #include "mmc_ptracer.h"
+#include "mmc_torch_profiler.h"
 
 namespace ock {
 namespace mmc {
@@ -153,6 +154,7 @@ std::string MmcBmProxy::GetDataOpType() const
 
 Result MmcBmProxy::Copy(uint64_t srcBmAddr, uint64_t dstBmAddr, uint64_t size, smem_bm_copy_type type)
 {
+    MMC_RECORD_FUNCTION("memcache::bm::copy");
     if (handle_ == nullptr) {
         MMC_LOG_ERROR("Failed to put data to smem bm, handle is null");
         return MMC_ERROR;
@@ -166,6 +168,7 @@ Result MmcBmProxy::Copy(uint64_t srcBmAddr, uint64_t dstBmAddr, uint64_t size, s
 
 Result MmcBmProxy::Put(const mmc_buffer *buf, uint64_t bmAddr, uint64_t size)
 {
+    MMC_RECORD_FUNCTION("memcache::bm::put");
     if (handle_ == nullptr) {
         MMC_LOG_ERROR("Failed to put data to smem bm, handle is null");
         return MMC_ERROR;
@@ -189,6 +192,7 @@ Result MmcBmProxy::Put(const mmc_buffer *buf, uint64_t bmAddr, uint64_t size)
 
 Result MmcBmProxy::Get(const mmc_buffer *buf, uint64_t bmAddr, uint64_t size)
 {
+    MMC_RECORD_FUNCTION("memcache::bm::get");
     if (handle_ == nullptr) {
         MMC_LOG_ERROR("Failed to get data to smem bm, handle is null");
         return MMC_ERROR;
@@ -211,6 +215,7 @@ Result MmcBmProxy::Get(const mmc_buffer *buf, uint64_t bmAddr, uint64_t size)
 
 Result MmcBmProxy::AsyncPut(const MmcBufferArray &bufArr, const MmcMemBlobDesc &blob)
 {
+    MMC_RECORD_FUNCTION("memcache::bm::async_put");
     if (handle_ == nullptr) {
         MMC_LOG_ERROR("Failed to get data to smem bm, handle is null");
         return MMC_ERROR;
@@ -235,6 +240,7 @@ Result MmcBmProxy::AsyncPut(const MmcBufferArray &bufArr, const MmcMemBlobDesc &
 
 Result MmcBmProxy::AsyncGet(const MmcBufferArray &bufArr, const MmcMemBlobDesc &blob)
 {
+    MMC_RECORD_FUNCTION("memcache::bm::async_get");
     if (handle_ == nullptr) {
         MMC_LOG_ERROR("Failed to get data to smem bm, handle is null");
         return MMC_ERROR;
@@ -259,6 +265,7 @@ Result MmcBmProxy::AsyncGet(const MmcBufferArray &bufArr, const MmcMemBlobDesc &
 
 Result MmcBmProxy::BatchPut(const MmcBufferArray &bufArr, const MmcMemBlobDesc &blob)
 {
+    MMC_RECORD_FUNCTION("memcache::bm::batch_put");
     if (handle_ == nullptr) {
         MMC_LOG_ERROR("Failed to get data to smem bm, handle is null");
         return MMC_ERROR;
@@ -291,6 +298,7 @@ Result MmcBmProxy::BatchPut(const MmcBufferArray &bufArr, const MmcMemBlobDesc &
 
 Result MmcBmProxy::BatchGet(const MmcBufferArray &bufArr, const MmcMemBlobDesc &blob)
 {
+    MMC_RECORD_FUNCTION("memcache::bm::batch_get");
     if (handle_ == nullptr) {
         MMC_LOG_ERROR("Failed to get data to smem bm, handle is null");
         return MMC_ERROR;
@@ -324,6 +332,7 @@ Result MmcBmProxy::BatchGet(const MmcBufferArray &bufArr, const MmcMemBlobDesc &
 Result MmcBmProxy::BatchDataPut(std::vector<void *> &sources, std::vector<void *> &destinations,
                                 const std::vector<uint64_t> &sizes, MediaType localMedia)
 {
+    MMC_RECORD_FUNCTION("memcache::bm::batch_data_put");
     if (sources.empty() || sources.size() != destinations.size() || sources.size() != sizes.size()) {
         MMC_LOG_ERROR("Failed data copy, sources:" << sources.size() << ", destinations:" << destinations.size()
                                                    << ", sizes:" << sizes.size());
@@ -354,6 +363,7 @@ Result MmcBmProxy::BatchDataPut(std::vector<void *> &sources, std::vector<void *
 Result MmcBmProxy::BatchDataGet(std::vector<void *> &sources, std::vector<void *> &destinations,
                                 const std::vector<uint64_t> &sizes, MediaType localMedia)
 {
+    MMC_RECORD_FUNCTION("memcache::bm::batch_data_get");
     if (sources.empty() || sources.size() != destinations.size() || sources.size() != sizes.size()) {
         MMC_LOG_ERROR("Failed data copy, sources:" << sources.size() << ", destinations:" << destinations.size()
                                                    << ", sizes:" << sizes.size());
@@ -383,6 +393,7 @@ Result MmcBmProxy::BatchDataGet(std::vector<void *> &sources, std::vector<void *
 
 Result MmcBmProxy::RegisterBuffer(uint64_t addr, uint64_t size)
 {
+    MMC_RECORD_FUNCTION("memcache::bm::register_buffer");
     std::lock_guard<std::mutex> lock(mutex_);
     auto ret = smem_bm_register_user_mem(handle_, addr, size);
     if (ret != MMC_OK) {
@@ -393,6 +404,7 @@ Result MmcBmProxy::RegisterBuffer(uint64_t addr, uint64_t size)
 
 Result MmcBmProxy::UnRegisterBuffer(uint64_t addr)
 {
+    MMC_RECORD_FUNCTION("memcache::bm::unregister_buffer");
     std::lock_guard<std::mutex> lock(mutex_);
     auto ret = smem_bm_unregister_user_mem(handle_, addr);
     if (ret != MMC_OK) {
@@ -403,6 +415,7 @@ Result MmcBmProxy::UnRegisterBuffer(uint64_t addr)
 
 Result MmcBmProxy::CopyWait()
 {
+    MMC_RECORD_FUNCTION("memcache::bm::copy_wait");
     auto ret = smem_bm_wait(handle_);
     if (ret != MMC_OK) {
         MMC_LOG_ERROR("Failed to wait copy task ret:" << ret);

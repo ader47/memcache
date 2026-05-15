@@ -46,6 +46,28 @@ if (BUILD_TESTS STREQUAL "ON")
             ${PROJECT_SOURCE_DIR}/test/ut/testcase/memcache/include)
 endif ()
 
+if (ENABLE_TORCH_PROFILER STREQUAL "ON")
+    if (DEFINED PYTHON_EXECUTABLE)
+        set(TORCH_PYTHON_EXECUTABLE ${PYTHON_EXECUTABLE})
+    else ()
+        find_package(Python3 COMPONENTS Interpreter REQUIRED)
+        set(TORCH_PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
+    endif ()
+    execute_process(
+            COMMAND ${TORCH_PYTHON_EXECUTABLE} -c "import torch; print(torch.utils.cmake_prefix_path)"
+            OUTPUT_VARIABLE TORCH_CMAKE_PREFIX_PATH
+            ERROR_VARIABLE TORCH_CMAKE_PREFIX_PATH_ERROR
+            RESULT_VARIABLE TORCH_CMAKE_PREFIX_PATH_RESULT
+    )
+    if (NOT TORCH_CMAKE_PREFIX_PATH_RESULT EQUAL 0)
+        message(FATAL_ERROR "ENABLE_TORCH_PROFILER=ON requires an importable torch package: ${TORCH_CMAKE_PREFIX_PATH_ERROR}")
+    endif ()
+    string(STRIP "${TORCH_CMAKE_PREFIX_PATH}" TORCH_CMAKE_PREFIX_PATH)
+    list(APPEND CMAKE_PREFIX_PATH "${TORCH_CMAKE_PREFIX_PATH}")
+    find_package(Torch REQUIRED)
+    separate_arguments(TORCH_CXX_FLAGS_LIST NATIVE_COMMAND "${TORCH_CXX_FLAGS}")
+endif ()
+
 if (BUILD_PYTHON STREQUAL "ON")
     include_directories(
             ${PYTHON_INCLUDE_DIR}
@@ -103,10 +125,18 @@ set(PLATFORM_SRC ${MMC_SRC_COMMON}
 add_library(mmc_objects OBJECT ${PLATFORM_SRC})
 target_link_libraries(mmc_objects PUBLIC smem)
 target_compile_options(mmc_objects PRIVATE -fPIC -Wno-float-equal)
+if (ENABLE_TORCH_PROFILER STREQUAL "ON")
+    target_compile_definitions(mmc_objects PRIVATE MMC_ENABLE_TORCH_PROFILER)
+    target_include_directories(mmc_objects PRIVATE ${TORCH_INCLUDE_DIRS})
+    target_compile_options(mmc_objects PRIVATE ${TORCH_CXX_FLAGS_LIST})
+endif ()
 
 add_library(mmc_static STATIC $<TARGET_OBJECTS:mmc_objects>)
 set_target_properties(mmc_static PROPERTIES OUTPUT_NAME "mf_memcache")
 target_link_libraries(mmc_static PUBLIC pthread acc_tcp_net_static)
+if (ENABLE_TORCH_PROFILER STREQUAL "ON")
+    target_link_libraries(mmc_static PUBLIC ${TORCH_LIBRARIES})
+endif ()
 target_link_directories(mmc_static PUBLIC ${PROJECT_3RDPARTY_BIN_DIR}/spdlog/lib)
 target_link_directories(mmc_static PUBLIC ${PROJECT_3RDPARTY_BIN_DIR}/spdlog/lib64)
 if (BUILD_PYTHON STREQUAL "ON")
@@ -122,6 +152,9 @@ endif ()
 add_library(mmc_shared SHARED $<TARGET_OBJECTS:mmc_objects>)
 set_target_properties(mmc_shared PROPERTIES OUTPUT_NAME "mf_memcache")
 target_link_libraries(mmc_shared PUBLIC smem_shared pthread acc_tcp_net_static)
+if (ENABLE_TORCH_PROFILER STREQUAL "ON")
+    target_link_libraries(mmc_shared PUBLIC ${TORCH_LIBRARIES})
+endif ()
 target_link_directories(mmc_shared PUBLIC ${PROJECT_3RDPARTY_BIN_DIR}/spdlog/lib)
 target_link_directories(mmc_shared PUBLIC ${PROJECT_3RDPARTY_BIN_DIR}/spdlog/lib64)
 if (x${CMAKE_BUILD_TYPE} STREQUAL "xDEBUG")

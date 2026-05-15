@@ -16,6 +16,7 @@
 #include "mmc_bm_proxy.h"
 #include "mmc_montotonic.h"
 #include "mmc_ptracer.h"
+#include "mmc_torch_profiler.h"
 #include "dl_acl_api.h"
 
 namespace ock {
@@ -132,6 +133,7 @@ const std::string &MmcClientDefault::Name() const
 
 Result MmcClientDefault::Put(const char *key, mmc_buffer *buf, mmc_put_options &options, uint32_t flags)
 {
+    MMC_RECORD_FUNCTION("memcache::client::put_buffer");
     MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
@@ -174,6 +176,7 @@ Result MmcClientDefault::PrepareAllocOpt(const uint64_t blobSize, const mmc_put_
 Result MmcClientDefault::Put(const std::string &key, const MmcBufferArray &bufArr, mmc_put_options &options,
                              uint32_t flags)
 {
+    MMC_RECORD_FUNCTION("memcache::client::put");
     MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
     MMC_ASSERT_RETURN(!bufArr.Buffers().empty(), MMC_ERROR);
@@ -221,6 +224,7 @@ Result MmcClientDefault::Put(const std::string &key, const MmcBufferArray &bufAr
 Result MmcClientDefault::BatchPut(const std::vector<std::string> &keys, const std::vector<mmc_buffer> &bufs,
                                   mmc_put_options &options, uint32_t flags, std::vector<int> &batchResult)
 {
+    MMC_RECORD_FUNCTION("memcache::client::batch_put_buffer");
     MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
@@ -244,6 +248,7 @@ Result MmcClientDefault::BatchPut(const std::vector<std::string> &keys, const st
 Result MmcClientDefault::BatchPut(const std::vector<std::string> &keys, const std::vector<MmcBufferArray> &bufArrs,
                                   mmc_put_options &options, uint32_t flags, std::vector<int> &batchResult)
 {
+    MMC_RECORD_FUNCTION("memcache::client::batch_put");
     MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
@@ -296,6 +301,7 @@ Result MmcClientDefault::BatchPut(const std::vector<std::string> &keys, const st
 
 Result MmcClientDefault::Get(const char *key, mmc_buffer *buf, uint32_t flags)
 {
+    MMC_RECORD_FUNCTION("memcache::client::get_buffer");
     if (buf == nullptr || key == nullptr || key[0] == '\0' || strnlen(key, KEY_MAX_LENTH + 1) == KEY_MAX_LENTH + 1) {
         MMC_LOG_ERROR("Invalid arguments");
         return MMC_ERROR;
@@ -308,6 +314,7 @@ Result MmcClientDefault::Get(const char *key, mmc_buffer *buf, uint32_t flags)
 
 Result MmcClientDefault::Get(const std::string &key, const MmcBufferArray &bufArr, uint32_t flags)
 {
+    MMC_RECORD_FUNCTION("memcache::client::get");
     MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
@@ -376,6 +383,7 @@ Result MmcClientDefault::Get(const std::string &key, const MmcBufferArray &bufAr
 Result MmcClientDefault::BatchGet(const std::vector<std::string> &keys, std::vector<mmc_buffer> &bufs, uint32_t flags,
                                   std::vector<int> &batchResult)
 {
+    MMC_RECORD_FUNCTION("memcache::client::batch_get_buffer");
     MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
     if ((keys.empty() || bufs.empty() || keys.size() != bufs.size())) {
@@ -397,6 +405,7 @@ Result MmcClientDefault::BatchGet(const std::vector<std::string> &keys, std::vec
 Result MmcClientDefault::BatchGet(const std::vector<std::string> &keys, const std::vector<MmcBufferArray> &bufArrs,
                                   uint32_t flags, std::vector<int> &batchResult)
 {
+    MMC_RECORD_FUNCTION("memcache::client::batch_get");
     MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
@@ -503,6 +512,7 @@ Result MmcClientDefault::BatchGet(const std::vector<std::string> &keys, const st
 
 Result MmcClientDefault::Remove(const char *key, uint32_t flags) const
 {
+    MMC_RECORD_FUNCTION("memcache::client::remove");
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
     RemoveRequest request{key};
@@ -515,6 +525,7 @@ Result MmcClientDefault::Remove(const char *key, uint32_t flags) const
 Result MmcClientDefault::BatchRemove(const std::vector<std::string> &keys, std::vector<Result> &remove_results,
                                      uint32_t flags) const
 {
+    MMC_RECORD_FUNCTION("memcache::client::batch_remove");
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
     BatchRemoveRequest request{keys};
@@ -536,6 +547,7 @@ Result MmcClientDefault::BatchRemove(const std::vector<std::string> &keys, std::
 
 Result MmcClientDefault::RemoveAll(uint32_t flags) const
 {
+    MMC_RECORD_FUNCTION("memcache::client::remove_all");
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
     RemoveAllRequest request{};
@@ -549,6 +561,7 @@ Result MmcClientDefault::RemoveAll(uint32_t flags) const
 
 Result MmcClientDefault::IsExist(const std::string &key, uint32_t flags) const
 {
+    MMC_RECORD_FUNCTION("memcache::client::is_exist");
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
     if (key.empty()) {
@@ -566,6 +579,7 @@ Result MmcClientDefault::IsExist(const std::string &key, uint32_t flags) const
 Result MmcClientDefault::BatchIsExist(const std::vector<std::string> &keys, std::vector<int32_t> &exist_results,
                                       uint32_t flags) const
 {
+    MMC_RECORD_FUNCTION("memcache::client::batch_is_exist");
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
     if (keys.empty()) {
@@ -591,6 +605,7 @@ Result MmcClientDefault::BatchIsExist(const std::vector<std::string> &keys, std:
 
 Result MmcClientDefault::Query(const std::string &key, mmc_data_info &query_info, uint32_t flags) const
 {
+    MMC_RECORD_FUNCTION("memcache::client::query");
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
     if (key.empty()) {
@@ -618,6 +633,7 @@ Result MmcClientDefault::Query(const std::string &key, mmc_data_info &query_info
 Result MmcClientDefault::BatchQuery(const std::vector<std::string> &keys, std::vector<mmc_data_info> &query_infos,
                                     uint32_t flags) const
 {
+    MMC_RECORD_FUNCTION("memcache::client::batch_query");
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
     if (keys.empty()) {
@@ -661,6 +677,7 @@ Result MmcClientDefault::BatchQuery(const std::vector<std::string> &keys, std::v
 void MmcClientDefault::WaitFeatures(std::vector<std::tuple<uint32_t, uint32_t, std::future<int32_t>>> &futures,
                                     std::vector<int> &batchResult)
 {
+    MMC_RECORD_FUNCTION("memcache::client::wait_futures");
     for (auto &tuple : futures) {
         auto res = std::get<2>(tuple).get();
         if (res == MMC_OK) {
@@ -831,9 +848,11 @@ Result MmcClientDefault::PrepareMultiBlobs(const MmcBufferArray &bufArr, const s
 
 std::future<int32_t> MmcClientDefault::SubmitPutTask(BatchCopyDesc &copyDesc, MediaType mediaType, bool asyncExec)
 {
+    MMC_RECORD_FUNCTION("memcache::client::submit_put_task");
     if (asyncExec) {
         auto future = writeThreadPool_->Enqueue(
             [&](BatchCopyDesc copyDescL, MediaType localMediaL) -> int32_t {
+                MMC_RECORD_FUNCTION("memcache::client::write_thread_batch_put");
                 return bmProxy_->BatchDataPut(copyDescL.srcs, copyDescL.dsts, copyDescL.sizes, localMediaL);
             },
             copyDesc, mediaType);
@@ -854,9 +873,11 @@ std::future<int32_t> MmcClientDefault::SubmitPutTask(BatchCopyDesc &copyDesc, Me
 
 std::future<int32_t> MmcClientDefault::SubmitGetTask(BatchCopyDesc &copyDesc, MediaType mediaType, bool asyncExec)
 {
+    MMC_RECORD_FUNCTION("memcache::client::submit_get_task");
     if (asyncExec) {
         auto future = readThreadPool_->Enqueue(
             [&](BatchCopyDesc copyDescL, MediaType localMediaL) -> int32_t {
+                MMC_RECORD_FUNCTION("memcache::client::read_thread_batch_get");
                 return bmProxy_->BatchDataGet(copyDescL.srcs, copyDescL.dsts, copyDescL.sizes, localMediaL);
             },
             copyDesc, mediaType);
@@ -877,6 +898,7 @@ std::future<int32_t> MmcClientDefault::SubmitGetTask(BatchCopyDesc &copyDesc, Me
 Result MmcClientDefault::PutData2Blobs(const std::vector<std::string> &keys, const std::vector<MmcBufferArray> &bufArrs,
                                        const BatchAllocResponse &allocResponse, std::vector<int> &batchResult)
 {
+    MMC_RECORD_FUNCTION("memcache::client::put_data_to_blobs");
     MediaType mediaType = MEDIA_NONE;
     std::vector<std::tuple<uint32_t, uint32_t, std::future<int32_t>>> futures;
     BatchCopyDesc copyDesc{};
@@ -932,12 +954,14 @@ Result MmcClientDefault::PutData2Blobs(const std::vector<std::string> &keys, con
 
 Result MmcClientDefault::RegisterBuffer(uint64_t addr, uint64_t size)
 {
+    MMC_RECORD_FUNCTION("memcache::client::register_buffer");
     MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     return bmProxy_->RegisterBuffer(addr, size);
 }
 
 Result MmcClientDefault::UnRegisterBuffer(uint64_t addr, uint64_t size)
 {
+    MMC_RECORD_FUNCTION("memcache::client::unregister_buffer");
     MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     return bmProxy_->UnRegisterBuffer(addr);
 }
@@ -945,6 +969,7 @@ Result MmcClientDefault::UnRegisterBuffer(uint64_t addr, uint64_t size)
 Result MmcClientDefault::BatchMalloc(const std::vector<std::string> &keys, const std::vector<size_t> &sizes,
                                      const mmc_put_options &options, std::vector<uintptr_t> &gvas)
 {
+    MMC_RECORD_FUNCTION("memcache::client::batch_malloc");
     MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
@@ -997,6 +1022,7 @@ Result MmcClientDefault::BatchMalloc(const std::vector<std::string> &keys, const
 Result MmcClientDefault::BatchCopy(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
                                    const int32_t direct)
 {
+    MMC_RECORD_FUNCTION("memcache::client::batch_copy");
     MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
@@ -1037,6 +1063,7 @@ void MmcClientDefault::NotifyUpdateBlobByGva(const std::vector<void *> &gvas, co
 Result MmcClientDefault::BatchDataOperation(std::vector<void *> &gvas, std::vector<void *> &buffers,
                                             std::vector<size_t> &sizes, int32_t direct)
 {
+    MMC_RECORD_FUNCTION("memcache::client::batch_data_operation");
     size_t kMinBytesForConcurrency = batchChunkSize_ * batchChunkCount_;
 
     const bool isPut = (direct == SMEMB_COPY_L2G || direct == SMEMB_COPY_H2G);
@@ -1067,6 +1094,7 @@ Result MmcClientDefault::ExecuteConcurrently(const std::vector<void *> &gvas, co
                                              const std::vector<size_t> &sizes, bool isPut, MediaType mediaType,
                                              size_t chunkSize)
 {
+    MMC_RECORD_FUNCTION("memcache::client::execute_concurrently");
     const size_t total = sizes.size();
     std::vector<std::future<Result>> futures;
     futures.reserve(total);
@@ -1096,6 +1124,7 @@ Result MmcClientDefault::ExecuteConcurrently(const std::vector<void *> &gvas, co
         // 提交任务到线程池
         auto task = [this, sub_b = std::move(sub_buffers), sub_g = std::move(sub_gvas), sub_s = std::move(sub_sizes),
                      mediaType, isPut]() mutable -> Result {
+            MMC_RECORD_FUNCTION("memcache::client::concurrent_copy_chunk");
             return isPut ? bmProxy_->BatchDataPut(sub_b, sub_g, sub_s, mediaType)
                          : bmProxy_->BatchDataGet(sub_g, sub_b, sub_s, mediaType);
         };

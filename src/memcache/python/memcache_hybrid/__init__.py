@@ -17,6 +17,8 @@ __all__ = [
     "MetaConfig",
     "MetaService",
     "ReplicateConfig",
+    "start_profile",
+    "stop_profile",
 ]
 
 import ctypes
@@ -41,3 +43,4 @@ from _pymmc import (
     MetaService,
     ReplicateConfig,
 )
+from .profiling import start_profile, stop_profile

@@ -18,6 +18,7 @@
 #include "mmc_logger.h"
 #include "mmc_types.h"
 #include "mmc_ptracer.h"
+#include "mmc_torch_profiler.h"
 #include "mmc_locality_strategy.h"
 #include "smem_bm_def.h"
 #include "mmcache_store.h"
@@ -177,6 +178,7 @@ int MmcacheStore::UnRegisterBuffer(void *buffer, size_t size)
 
 int MmcacheStore::GetInto(const std::string &key, void *buffer, size_t size, const int32_t direct)
 {
+    MMC_RECORD_FUNCTION("memcache::python::get");
     uint32_t type = 0;
     switch (direct) {
         case SMEMB_COPY_G2L:
@@ -207,6 +209,7 @@ int MmcacheStore::GetLocalServiceId(uint32_t &localServiceId)
 int MmcacheStore::PutFrom(const std::string &key, void *buffer, size_t size, const int32_t direct,
                           const ReplicateConfig &replicateConfig)
 {
+    MMC_RECORD_FUNCTION("memcache::python::put");
     uint32_t type = 0;
     switch (direct) {
         case SMEMB_COPY_L2G:
@@ -232,6 +235,7 @@ int MmcacheStore::PutFrom(const std::string &key, void *buffer, size_t size, con
 
 int MmcacheStore::Remove(const std::string &key)
 {
+    MMC_RECORD_FUNCTION("memcache::python::remove");
     TP_TRACE_BEGIN(TP_MMC_PY_REMOVE);
     auto ret = mmcc_remove(key.c_str(), 0); // 0 - success, other - not success
     TP_TRACE_END(TP_MMC_PY_REMOVE, ret);
@@ -240,6 +244,7 @@ int MmcacheStore::Remove(const std::string &key)
 
 std::vector<int> MmcacheStore::BatchRemove(const std::vector<std::string> &keys)
 {
+    MMC_RECORD_FUNCTION("memcache::python::batch_remove");
     std::vector<int> results;
 
     if (keys.empty()) {
@@ -274,6 +279,7 @@ std::vector<int> MmcacheStore::BatchRemove(const std::vector<std::string> &keys)
 
 int MmcacheStore::RemoveAll()
 {
+    MMC_RECORD_FUNCTION("memcache::python::remove_all");
     MMC_VALIDATE_RETURN(MmcClientDefault::GetInstance() != nullptr, "client is not initialize", MMC_CLIENT_NOT_INIT);
     MMC_RETURN_ERROR(MmcClientDefault::GetInstance()->RemoveAll(0), MmcClientDefault::GetInstance()->Name()
                                                                         << " remove all keys failed!");
@@ -282,6 +288,7 @@ int MmcacheStore::RemoveAll()
 
 int MmcacheStore::IsExist(const std::string &key)
 {
+    MMC_RECORD_FUNCTION("memcache::python::is_exist");
     TP_TRACE_BEGIN(TP_MMC_PY_EXIST);
     int32_t res = mmcc_exist(key.c_str(), 0);
     TP_TRACE_END(TP_MMC_PY_EXIST, res);
@@ -297,6 +304,7 @@ int MmcacheStore::IsExist(const std::string &key)
 
 std::vector<int> MmcacheStore::BatchIsExist(const std::vector<std::string> &keys)
 {
+    MMC_RECORD_FUNCTION("memcache::python::batch_is_exist");
     std::vector<int> results;
 
     if (keys.empty()) {
@@ -341,6 +349,7 @@ std::vector<int> MmcacheStore::BatchIsExist(const std::vector<std::string> &keys
 
 KeyInfo MmcacheStore::GetKeyInfo(const std::string &key)
 {
+    MMC_RECORD_FUNCTION("memcache::python::get_key_info");
     mmc_data_info info;
     TP_TRACE_BEGIN(TP_MMC_PY_QUERY);
     auto res = mmcc_query(key.c_str(), &info, 0);
@@ -366,6 +375,7 @@ KeyInfo MmcacheStore::GetKeyInfo(const std::string &key)
 
 std::vector<KeyInfo> MmcacheStore::BatchGetKeyInfo(const std::vector<std::string> &keys)
 {
+    MMC_RECORD_FUNCTION("memcache::python::batch_get_key_info");
     uint32_t size = keys.size();
 
     if (keys.empty()) {
@@ -425,6 +435,7 @@ std::vector<int> MmcacheStore::BatchPutFrom(const std::vector<std::string> &keys
                                             const std::vector<size_t> &sizes, const int32_t direct,
                                             const ReplicateConfig &replicateConfig)
 {
+    MMC_RECORD_FUNCTION("memcache::python::batch_put");
     const size_t count = keys.size();
     MMC_VALIDATE_RETURN(count > 0, "key vector is empty", {});
     MMC_VALIDATE_RETURN(count <= MAX_BATCH_OP_COUNT, "key vector length exceeds limit" << MAX_BATCH_OP_COUNT,
@@ -473,6 +484,7 @@ std::vector<int> MmcacheStore::BatchPutFrom(const std::vector<std::string> &keys
 std::vector<int> MmcacheStore::BatchGetInto(const std::vector<std::string> &keys, const std::vector<void *> &buffers,
                                             const std::vector<size_t> &sizes, const int32_t direct)
 {
+    MMC_RECORD_FUNCTION("memcache::python::batch_get");
     size_t count = keys.size();
     MMC_VALIDATE_RETURN(count > 0, "key vector is empty", {});
     MMC_VALIDATE_RETURN(count <= MAX_BATCH_OP_COUNT, "key vector length exceeds limit" << MAX_BATCH_OP_COUNT,
@@ -522,6 +534,7 @@ int MmcacheStore::PutFromLayers(const std::string &key, const std::vector<void *
                                 const std::vector<size_t> &sizes, const int32_t direct,
                                 const ReplicateConfig &replicateConfig)
 {
+    MMC_RECORD_FUNCTION("memcache::python::put_layers");
     MMC_ASSERT_RETURN(MmcClientDefault::GetInstance() != nullptr, MMC_INVALID_PARAM);
     if (direct != SMEMB_COPY_L2G && direct != SMEMB_COPY_H2G && direct != SMEMB_COPY_AUTO) {
         MMC_LOG_ERROR(
@@ -580,6 +593,7 @@ std::vector<int> MmcacheStore::BatchPutFromLayers(const std::vector<std::string>
                                                   const std::vector<std::vector<size_t>> &sizes, const int32_t direct,
                                                   const ReplicateConfig &replicateConfig)
 {
+    MMC_RECORD_FUNCTION("memcache::python::batch_put_layers");
     MMC_ASSERT_RETURN(MmcClientDefault::GetInstance() != nullptr, {});
     const size_t batchSize = keys.size();
     MMC_VALIDATE_RETURN(batchSize > 0, "key vector is empty", {});
@@ -645,6 +659,7 @@ std::vector<int> MmcacheStore::BatchPutFromLayers(const std::vector<std::string>
 int MmcacheStore::GetIntoLayers(const std::string &key, const std::vector<void *> &buffers,
                                 const std::vector<size_t> &sizes, const int32_t direct)
 {
+    MMC_RECORD_FUNCTION("memcache::python::get_layers");
     if (direct != SMEMB_COPY_G2L && direct != SMEMB_COPY_G2H && direct != SMEMB_COPY_AUTO) {
         MMC_LOG_ERROR(
             "Invalid direct(" << direct
@@ -699,6 +714,7 @@ std::vector<int> MmcacheStore::BatchGetIntoLayers(const std::vector<std::string>
                                                   const std::vector<std::vector<void *>> &buffers,
                                                   const std::vector<std::vector<size_t>> &sizes, const int32_t direct)
 {
+    MMC_RECORD_FUNCTION("memcache::python::batch_get_layers");
     MMC_ASSERT_RETURN(MmcClientDefault::GetInstance() != nullptr, {});
     const size_t batchSize = keys.size();
     MMC_VALIDATE_RETURN(batchSize > 0, "key vector is empty", {});
@@ -807,6 +823,7 @@ int MmcacheStore::ReturnWrapper(const int result, const std::string &key)
 
 int MmcacheStore::Put(const std::string &key, mmc_buffer &buffer, const ReplicateConfig &replicateConfig)
 {
+    MMC_RECORD_FUNCTION("memcache::python::put_buffer");
     mmc_put_options options{};
     MMC_ASSERT_RETURN(CopyPutOptions(replicateConfig, options), MMC_ERROR);
     TP_TRACE_BEGIN(TP_MMC_PY_PUT);
@@ -819,6 +836,7 @@ int MmcacheStore::Put(const std::string &key, mmc_buffer &buffer, const Replicat
 int MmcacheStore::PutBatch(const std::vector<std::string> &keys, std::vector<mmc_buffer> &buffers,
                            const ReplicateConfig &replicateConfig)
 {
+    MMC_RECORD_FUNCTION("memcache::python::put_batch_buffer");
     const size_t count = keys.size();
     MMC_VALIDATE_RETURN(count > 0, "key vector is empty", 0);
     MMC_VALIDATE_RETURN(count <= MAX_BATCH_OP_COUNT, "key vector length exceeds limit" << MAX_BATCH_OP_COUNT,
@@ -853,6 +871,7 @@ int MmcacheStore::PutBatch(const std::vector<std::string> &keys, std::vector<mmc
 
 mmc_buffer MmcacheStore::Get(const std::string &key)
 {
+    MMC_RECORD_FUNCTION("memcache::python::get_buffer");
     mmc_data_info info;
     auto res = mmcc_query(key.c_str(), &info, 0);
     if (res != MMC_OK) {
@@ -889,6 +908,7 @@ mmc_buffer MmcacheStore::Get(const std::string &key)
 
 std::vector<mmc_buffer> MmcacheStore::GetBatch(const std::vector<std::string> &keys)
 {
+    MMC_RECORD_FUNCTION("memcache::python::get_batch_buffer");
     size_t count = keys.size();
     MMC_VALIDATE_RETURN(count > 0, "key vector is empty", {});
     MMC_VALIDATE_RETURN(count <= MAX_BATCH_OP_COUNT, "key vector length exceeds limit" << MAX_BATCH_OP_COUNT, {});
@@ -934,6 +954,7 @@ std::vector<mmc_buffer> MmcacheStore::GetBatch(const std::vector<std::string> &k
 std::vector<uintptr_t> MmcacheStore::BatchMalloc(const std::vector<std::string> &keys, const std::vector<size_t> &sizes,
                                                  uint16_t media)
 {
+    MMC_RECORD_FUNCTION("memcache::python::batch_malloc");
     std::vector<uintptr_t> gvas(keys.size(), 0);
     if (keys.size() != sizes.size()) {
         MMC_LOG_ERROR("Input vector sizes mismatch: keys=" << keys.size() << ", sizes=" << sizes.size());
@@ -959,6 +980,7 @@ std::vector<uintptr_t> MmcacheStore::BatchMalloc(const std::vector<std::string> 
 int MmcacheStore::BatchCopy(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
                             const int32_t direct)
 {
+    MMC_RECORD_FUNCTION("memcache::python::batch_copy");
     return MmcClientDefault::GetInstance()->BatchCopy(gvas, buffers, sizes, direct);
 }
 

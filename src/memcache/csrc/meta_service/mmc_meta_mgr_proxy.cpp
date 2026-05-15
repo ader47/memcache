@@ -11,6 +11,7 @@
 */
 #include "mmc_meta_mgr_proxy.h"
 #include "mmc_ptracer.h"
+#include "mmc_torch_profiler.h"
 
 #include <algorithm>
 #include <cctype>
@@ -34,6 +35,7 @@ namespace ock {
 namespace mmc {
 Result MmcMetaMgrProxy::Alloc(const AllocRequest &req, AllocResponse &resp)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_mgr::alloc");
     MmcMetaMetricManager &metricManager = MmcMetaMetricManager::GetInstance();
     metricManager.IncrementRequestCounter(RestMetricType::ALLOC);
     metaMangerPtr_->CheckAndEvict(static_cast<MediaType>(req.options_.mediaType_),
@@ -57,6 +59,7 @@ Result MmcMetaMgrProxy::Alloc(const AllocRequest &req, AllocResponse &resp)
 
 Result MmcMetaMgrProxy::BatchAlloc(const BatchAllocRequest &req, BatchAllocResponse &resp)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_mgr::batch_alloc");
     MmcMetaMetricManager &metricManager = MmcMetaMetricManager::GetInstance();
     metricManager.IncrementRequestCounter(RestMetricType::BATCH_ALLOC);
     resp.results_.resize(req.keys_.size());
@@ -100,6 +103,7 @@ Result MmcMetaMgrProxy::BatchAlloc(const BatchAllocRequest &req, BatchAllocRespo
 
 Result MmcMetaMgrProxy::UpdateState(const UpdateRequest &req, Response &resp)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_mgr::update_state");
     MmcMetaMetricManager &metricManager = MmcMetaMetricManager::GetInstance();
     metricManager.IncrementRequestCounter(RestMetricType::UPDATE_STATE);
     MmcLocation loc{req.rank_, static_cast<MediaType>(req.mediaType_)};
@@ -111,6 +115,7 @@ Result MmcMetaMgrProxy::UpdateState(const UpdateRequest &req, Response &resp)
 
 Result MmcMetaMgrProxy::BatchUpdateState(const BatchUpdateRequest &req, BatchUpdateResponse &resp)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_mgr::batch_update_state");
     MmcMetaMetricManager &metricManager = MmcMetaMetricManager::GetInstance();
     metricManager.IncrementRequestCounter(RestMetricType::BATCH_UPDATE_STATE);
     const size_t keyCount = req.keys_.size();
@@ -138,6 +143,7 @@ Result MmcMetaMgrProxy::BatchUpdateState(const BatchUpdateRequest &req, BatchUpd
 
 Result MmcMetaMgrProxy::BatchUpdateBlobState(const BatchUpdateBlobRequest &req, BatchUpdateResponse &resp)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_mgr::batch_update_blob_state");
     const size_t gvaCount = req.gvas_.size();
     if (gvaCount != req.sizes_.size() || gvaCount != req.actionResults_.size()) {
         MMC_LOG_ERROR("Input vectors size mismatch {gvaNum:" << req.gvas_.size() << ", sizeNum:" << req.sizes_.size()
@@ -158,6 +164,7 @@ Result MmcMetaMgrProxy::BatchUpdateBlobState(const BatchUpdateBlobRequest &req, 
 
 Result MmcMetaMgrProxy::Get(const GetRequest &req, AllocResponse &resp)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_mgr::get");
     MmcMetaMetricManager &metricManager = MmcMetaMetricManager::GetInstance();
     metricManager.IncrementRequestCounter(RestMetricType::GET);
     MmcMemMetaDesc objMeta;
@@ -184,6 +191,7 @@ Result MmcMetaMgrProxy::Get(const GetRequest &req, AllocResponse &resp)
 
 Result MmcMetaMgrProxy::GetAllKeys(std::vector<std::string> &keys)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_mgr::get_all_keys");
     MmcMetaMetricManager &metricManager = MmcMetaMetricManager::GetInstance();
     metricManager.IncrementRequestCounter(RestMetricType::GET_ALL_KEYS);
     Result ret = metaMangerPtr_->GetAllKeys(keys);
@@ -193,6 +201,7 @@ Result MmcMetaMgrProxy::GetAllKeys(std::vector<std::string> &keys)
 
 Result MmcMetaMgrProxy::GetAllSegmentInfo(nlohmann::json &result)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_mgr::get_all_segment_info");
     result = metaMangerPtr_->GetAllSegmentInfo();
     if (!result.is_array()) {
         return MMC_ERROR;
@@ -209,6 +218,7 @@ Result MmcMetaMgrProxy::GetAllSegmentInfo(nlohmann::json &result)
 
 Result MmcMetaMgrProxy::QuerySegment(const std::string &segmentId, nlohmann::json &segment)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_mgr::query_segment");
     nlohmann::json segmentInfo = metaMangerPtr_->GetAllSegmentInfo();
     if (!segmentInfo.is_array()) {
         return MMC_ERROR;
@@ -234,6 +244,7 @@ Result MmcMetaMgrProxy::QuerySegment(const std::string &segmentId, nlohmann::jso
 
 Result MmcMetaMgrProxy::BatchGet(const BatchGetRequest &req, BatchAllocResponse &resp)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_mgr::batch_get");
     MmcMetaMetricManager &metricManager = MmcMetaMetricManager::GetInstance();
     metricManager.IncrementRequestCounter(RestMetricType::BATCH_GET);
     resp.numBlobs_.resize(req.keys_.size(), 0);
@@ -270,6 +281,7 @@ Result MmcMetaMgrProxy::BatchGet(const BatchGetRequest &req, BatchAllocResponse 
 
 Result MmcMetaMgrProxy::BatchExistKey(const BatchIsExistRequest &req, BatchIsExistResponse &resp)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_mgr::batch_exist_key");
     MmcMetaMetricManager &metricManager = MmcMetaMetricManager::GetInstance();
     metricManager.IncrementRequestCounter(RestMetricType::BATCH_EXIST_KEY);
     resp.results_.reserve(req.keys_.size());

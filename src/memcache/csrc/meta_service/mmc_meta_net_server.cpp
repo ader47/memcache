@@ -14,6 +14,7 @@
 #include "mmc_msg_client_meta.h"
 #include "mmc_meta_service.h"
 #include "mmc_ptracer.h"
+#include "mmc_torch_profiler.h"
 
 namespace ock {
 namespace mmc {
@@ -98,6 +99,7 @@ Result ock::mmc::MetaNetServer::Start(NetEngineOptions &options)
 
 Result MetaNetServer::HandleBmRegister(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::bm_register");
     MMC_ASSERT_RETURN(metaService_ != nullptr, MMC_ERROR);
     MMC_ASSERT_RETURN(context != nullptr, MMC_ERROR);
     BmRegisterRequest req;
@@ -114,6 +116,7 @@ Result MetaNetServer::HandleBmRegister(const NetContextPtr &context)
 
 Result MetaNetServer::HandleBmUnregister(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::bm_unregister");
     MMC_ASSERT_RETURN(metaService_ != nullptr, MMC_ERROR);
     BmUnregisterRequest req;
     Response resp;
@@ -135,6 +138,7 @@ Result MetaNetServer::HandleBmUnregister(const NetContextPtr &context)
 
 Result MetaNetServer::HandlePing(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::ping");
     std::string str{static_cast<char *>(context->Data()), context->DataLen()};
     NetMsgUnpacker unpacker(str);
     PingMsg req;
@@ -151,12 +155,14 @@ Result MetaNetServer::HandlePing(const NetContextPtr &context)
 
 Result MetaNetServer::HandleNewLink(const NetLinkPtr &link)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::new_link");
     MMC_LOG_INFO(name_ << " new link, id: " << link->Id());
     return MMC_OK;
 }
 
 Result MetaNetServer::HandleLinkBroken(const NetLinkPtr &link)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::link_broken");
     MMC_LOG_DEBUG(name_ << " link broken");
     MMC_ASSERT_RETURN(metaService_ != nullptr, MMC_ERROR);
     int32_t rankId = link->Id();
@@ -168,6 +174,7 @@ Result MetaNetServer::HandleLinkBroken(const NetLinkPtr &link)
 
 Result MetaNetServer::HandleAlloc(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::alloc");
     MMC_ASSERT_RETURN(context != nullptr, MMC_ERROR);
     AllocRequest req;
     AllocResponse resp;
@@ -190,6 +197,7 @@ Result MetaNetServer::HandleAlloc(const NetContextPtr &context)
 
 Result MetaNetServer::HandleBatchAlloc(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::batch_alloc");
     BatchAllocRequest req;
     BatchAllocResponse resp;
 
@@ -213,6 +221,7 @@ Result MetaNetServer::HandleBatchAlloc(const NetContextPtr &context)
 
 Result MetaNetServer::HandleBatchUpdateBlob(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::batch_update_blob");
     BatchUpdateBlobRequest req{};
     BatchUpdateResponse resp{};
     context->GetRequest<BatchUpdateBlobRequest>(req);
@@ -226,6 +235,7 @@ Result MetaNetServer::HandleBatchUpdateBlob(const NetContextPtr &context)
 
 Result MetaNetServer::HandleUpdate(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::update");
     UpdateRequest req;
     Response resp;
     context->GetRequest<UpdateRequest>(req);
@@ -241,6 +251,7 @@ Result MetaNetServer::HandleUpdate(const NetContextPtr &context)
 
 Result MetaNetServer::HandleBatchUpdate(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::batch_update");
     BatchUpdateRequest req;
     BatchUpdateResponse resp;
     context->GetRequest<BatchUpdateRequest>(req);
@@ -257,6 +268,7 @@ Result MetaNetServer::HandleBatchUpdate(const NetContextPtr &context)
 
 Result MetaNetServer::HandleGet(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::get");
     GetRequest req;
     AllocResponse resp;
     context->GetRequest<GetRequest>(req);
@@ -272,6 +284,7 @@ Result MetaNetServer::HandleGet(const NetContextPtr &context)
 
 Result MetaNetServer::HandleBatchGet(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::batch_get");
     BatchGetRequest req;
     BatchAllocResponse resp;
     context->GetRequest<BatchGetRequest>(req);
@@ -288,6 +301,7 @@ Result MetaNetServer::HandleBatchGet(const NetContextPtr &context)
 
 Result MetaNetServer::HandleRemove(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::remove");
     RemoveRequest req;
     Response resp;
     context->GetRequest<RemoveRequest>(req);
@@ -303,6 +317,7 @@ Result MetaNetServer::HandleRemove(const NetContextPtr &context)
 
 Result MetaNetServer::HandleBatchRemove(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::batch_remove");
     BatchRemoveRequest req;
     BatchRemoveResponse resp;
     context->GetRequest<BatchRemoveRequest>(req);
@@ -319,6 +334,7 @@ Result MetaNetServer::HandleBatchRemove(const NetContextPtr &context)
 
 Result MetaNetServer::HandleRemoveAll(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::remove_all");
     RemoveAllRequest req;
     Response resp;
     context->GetRequest<RemoveAllRequest>(req);
@@ -335,6 +351,7 @@ Result MetaNetServer::HandleRemoveAll(const NetContextPtr &context)
 
 Result MetaNetServer::HandleIsExist(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::is_exist");
     IsExistRequest req;
     IsExistResponse resp;
     context->GetRequest<IsExistRequest>(req);
@@ -350,6 +367,7 @@ Result MetaNetServer::HandleIsExist(const NetContextPtr &context)
 
 Result MetaNetServer::HandleBatchIsExist(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::batch_is_exist");
     BatchIsExistRequest req;
     BatchIsExistResponse resp;
     context->GetRequest<BatchIsExistRequest>(req);
@@ -366,6 +384,7 @@ Result MetaNetServer::HandleBatchIsExist(const NetContextPtr &context)
 
 Result MetaNetServer::HandleQuery(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::query");
     QueryRequest req;
     QueryResponse resp;
     context->GetRequest<QueryRequest>(req);
@@ -382,6 +401,7 @@ Result MetaNetServer::HandleQuery(const NetContextPtr &context)
 
 Result MetaNetServer::HandleBatchQuery(const NetContextPtr &context)
 {
+    MMC_RECORD_FUNCTION("memcache::meta_server::batch_query");
     BatchQueryRequest req;
     BatchQueryResponse resp;
     context->GetRequest<BatchQueryRequest>(req);
