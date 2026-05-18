@@ -16,12 +16,15 @@ CURRENT_DIR=$(pwd)
 BUILD_MODE="RELEASE"
 BUILD_PYTHON="ON"
 BUILD_TEST="OFF"
+ENABLE_TORCH_PROFILER="OFF"
 
 show_help() {
     echo "Usage: $0 [options]"
     echo "Options:"
     echo "  --build_mode <mode>     Set build mode (RELEASE/DEBUG/ASAN), default: RELEASE"
     echo "  --build_test <ON/OFF>   Enable/disable package test utilities, default: OFF"
+    echo "  --enable_torch_profiler <ON/OFF>"
+    echo "                          Enable torch profiler markers for memcache operations, default: OFF"
     echo "  --help                  Show this help message"
     echo ""
     echo "Example:"
@@ -39,6 +42,10 @@ while [[ "$#" -gt 0 ]]; do
             BUILD_TEST="$2"
             shift 2
             ;;
+        --enable_torch_profiler)
+            ENABLE_TORCH_PROFILER="$2"
+            shift 2
+            ;;
         --help)
             show_help
             exit 0
@@ -54,10 +61,11 @@ done
 
 echo "BUILD_MODE: $BUILD_MODE"
 echo "BUILD_PYTHON: $BUILD_PYTHON"
+echo "ENABLE_TORCH_PROFILER: $ENABLE_TORCH_PROFILER"
 
 cd "${ROOT_PATH}"
 
-bash build.sh "${BUILD_MODE}" OFF OFF "${BUILD_PYTHON}" ON
+bash build.sh "${BUILD_MODE}" OFF OFF "${BUILD_PYTHON}" ON "${ENABLE_TORCH_PROFILER}"
 
 bash run_pkg_maker/make_run.sh "${BUILD_TEST}"
 

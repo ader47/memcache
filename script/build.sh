@@ -14,6 +14,7 @@ export BUILD_TESTS=${2:-OFF}
 export BUILD_OPEN_ABI=${3:-OFF}
 export BUILD_PYTHON=${4:-ON}
 export ENABLE_PTRACER=${5:-ON}
+export ENABLE_TORCH_PROFILER=${6:-OFF}
 
 readonly SCRIPT_FULL_PATH=$(dirname $(readlink -f "$0"))
 readonly PROJECT_FULL_PATH=$(dirname "$SCRIPT_FULL_PATH")
@@ -97,6 +98,7 @@ cmake \
     -DBUILD_OPEN_ABI="${BUILD_OPEN_ABI}" \
     -DBUILD_PYTHON="${BUILD_PYTHON}" \
     -DENABLE_PTRACER="${ENABLE_PTRACER}" \
+    -DENABLE_TORCH_PROFILER="${ENABLE_TORCH_PROFILER}" \
     -S . -B build/
 
 ${MAKE_CMD} install -j"${MMC_BUILD_JOBS}" -C build/
