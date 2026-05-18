@@ -13,6 +13,10 @@ find_package(pybind11 REQUIRED)
 pybind11_add_module(_pymmc ${SOURCES} pymmc.cpp)
 
 target_link_libraries(_pymmc PUBLIC mmc_shared)
+if (ENABLE_TORCH_PROFILER STREQUAL "ON")
+    target_link_libraries(_pymmc PRIVATE ${TORCH_PROFILER_EXTRA_LIBRARIES})
+    target_link_options(_pymmc PRIVATE ${TORCH_PROFILER_RPATH_LINK_OPTIONS})
+endif ()
 
 install(TARGETS _pymmc
         LIBRARY DESTINATION ${TARGET_INSTALL_DIR}/memcache/lib64

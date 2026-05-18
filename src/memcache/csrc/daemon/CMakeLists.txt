@@ -26,6 +26,10 @@ if (MMC_META_SERVICE_BUILDABLE)
     target_link_options(mmc_meta_service PRIVATE -pie)
 
     target_link_libraries(mmc_meta_service PUBLIC mmc_shared pthread acc_tcp_net_static)
+    if (ENABLE_TORCH_PROFILER STREQUAL "ON")
+        target_link_libraries(mmc_meta_service PRIVATE ${TORCH_PROFILER_EXTRA_LIBRARIES})
+        target_link_options(mmc_meta_service PRIVATE ${TORCH_PROFILER_RPATH_LINK_OPTIONS})
+    endif ()
 
     if (BUILD_PYTHON STREQUAL "ON")
         target_link_libraries(mmc_meta_service PRIVATE pybind11::embed)
