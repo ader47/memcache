@@ -19,6 +19,7 @@
 #include "mmc_types.h"
 #include "mmc_ptracer.h"
 #include "mmc_locality_strategy.h"
+#include "mmc_thread_pool.h"
 #include "smem_bm_def.h"
 #include "mmcache_store.h"
 
@@ -151,6 +152,12 @@ std::shared_ptr<ObjectStore> ObjectStore::CreateObjectStore()
 int MmcacheStore::Setup(const local_config &config)
 {
     return mmc_setup(&config);
+}
+
+int MmcacheStore::SetClientCpuAffinity(const std::string &cpuSet)
+{
+    MmcThreadPool::SetDefaultClientCpuSet(cpuSet);
+    return MMC_OK;
 }
 
 int MmcacheStore::Init(const uint32_t deviceId, const bool initBm)

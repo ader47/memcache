@@ -625,6 +625,9 @@ PYBIND11_MODULE(_pymmc, m)
         .def(py::init<>())
         .def("setup", &MmcacheStore::Setup, py::call_guard<py::gil_scoped_release>(), py::arg("config"),
              "Setup local configuration")
+        .def("set_client_cpu_affinity", &MmcacheStore::SetClientCpuAffinity,
+             py::call_guard<py::gil_scoped_release>(), py::arg("cpu_set"),
+             "Set MemCache client worker CPU affinity before init. Example: '32-47' or '32,33,40-47'.")
         .def("init", &MmcacheStore::Init, py::call_guard<py::gil_scoped_release>(), py::arg("device_id"),
              py::arg("init_bm") = true)
         .def("remove", &MmcacheStore::Remove, py::call_guard<py::gil_scoped_release>())
