@@ -13,17 +13,27 @@
 #define __MEMFABRIC_HYBRID_MMC_THREAD_POOL_H__
 
 #include <vector>
+#include <algorithm>
+#include <atomic>
+#include <cctype>
 #include <queue>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <cstdlib>
 #include <functional>
 #include <future>
+#include <limits>
 #include <stdexcept>
 #include <type_traits>
 #include <pthread.h>
+#ifdef __linux__
+#include <sched.h>
+#endif
 #include <string>
+#include <sstream>
 #include <sys/resource.h>
+#include <unistd.h>
 #include "mmc_logger.h"
 #include "mmc_types.h"
 #include "mmc_ref.h"
@@ -58,31 +68,120 @@ public:
         }
     }
 
+    static inline void AppendCpuRange(std::vector<int32_t> &cpus, const std::string &token)
+    {
+        if (token.empty()) {
+            return;
+        }
+        auto dashPos = token.find('-');
+        if (dashPos == std::string::npos) {
+            cpus.emplace_back(std::stoi(token));
+            return;
+        }
+        int32_t start = std::stoi(token.substr(0, dashPos));
+        int32_t end = std::stoi(token.substr(dashPos + 1));
+        if (start > end) {
+            std::swap(start, end);
+        }
+        for (int32_t cpu = start; cpu <= end; ++cpu) {
+            cpus.emplace_back(cpu);
+        }
+    }
+
+    static inline std::vector<int32_t> ParseCpuSet(const char *cpuSet)
+    {
+        std::vector<int32_t> cpus;
+        if (cpuSet == nullptr || cpuSet[0] == '\0') {
+            return cpus;
+        }
+        std::stringstream ss(cpuSet);
+        std::string token;
+        while (std::getline(ss, token, ',')) {
+            token.erase(std::remove_if(token.begin(), token.end(),
+                                       [](unsigned char ch) { return std::isspace(ch); }),
+                        token.end());
+            try {
+                AppendCpuRange(cpus, token);
+            } catch (const std::exception &err) {
+                MMC_LOG_WARN("Ignore invalid cpu token '" << token << "' in MemCache client cpuset: " << err.what());
+            }
+        }
+        cpus.erase(std::remove_if(cpus.begin(), cpus.end(), [](int32_t cpu) {
+#ifdef __linux__
+                       return cpu < 0 || cpu >= CPU_SETSIZE;
+#else
+                       return cpu < 0;
+#endif
+                   }),
+                   cpus.end());
+        std::sort(cpus.begin(), cpus.end());
+        cpus.erase(std::unique(cpus.begin(), cpus.end()), cpus.end());
+        return cpus;
+    }
+
+    static inline std::vector<int32_t> GetClientCpuSetFromEnv()
+    {
+        {
+            std::lock_guard<std::mutex> lock(DefaultClientCpuSetMutex());
+            if (HasDefaultClientCpuSet()) {
+                return DefaultClientCpuSet();
+            }
+        }
+        const char *cpuSet = std::getenv("MMC_CLIENT_CPUSET");
+        if (cpuSet == nullptr || cpuSet[0] == '\0') {
+            cpuSet = std::getenv("VLLM_ASCEND_MEMCACHE_CLIENT_CPUS");
+        }
+        return ParseCpuSet(cpuSet);
+    }
+
+    static inline void SetDefaultClientCpuSet(const std::string &cpuSet)
+    {
+        std::lock_guard<std::mutex> lock(DefaultClientCpuSetMutex());
+        DefaultClientCpuSet() = ParseCpuSet(cpuSet.c_str());
+        HasDefaultClientCpuSet() = !cpuSet.empty();
+    }
+
     static inline int32_t NextCpu() noexcept
     {
+        static std::atomic<int32_t> nextId{0};
         auto num_cpus = static_cast<int32_t>(sysconf(_SC_NPROCESSORS_ONLN));
         if (num_cpus <= 0) {
             num_cpus = 1;
         }
-        static std::atomic<int32_t> nextId{0};
         if (nextId.fetch_add(1) > std::numeric_limits<int16_t>::max() - 1) {
             nextId.store(0);
         }
         return nextId.load() % num_cpus;
     }
 
-    static inline void TrySetThreadAffinityAndPriority()
+    static inline void TrySetThreadAffinityAndPriority(const std::vector<int32_t> &cpuSet = {})
     {
         static thread_local bool initialized = false;
         if (initialized) {
             return;
         }
         initialized = true;
+#ifdef __linux__
         cpu_set_t cpus;
         CPU_ZERO(&cpus);
-        CPU_SET(NextCpu(), &cpus);
-        pthread_setaffinity_np(pthread_self(), sizeof(cpus), &cpus);
+        if (cpuSet.empty()) {
+            CPU_SET(NextCpu(), &cpus);
+        } else {
+            for (auto cpu : cpuSet) {
+                CPU_SET(cpu, &cpus);
+            }
+        }
+        int ret = pthread_setaffinity_np(pthread_self(), sizeof(cpus), &cpus);
+        if (ret != 0) {
+            MMC_LOG_WARN("Failed to bind thread " << std::this_thread::get_id() << ", ret:" << ret);
+        }
         setpriority(PRIO_PROCESS, 0, MIN_NICE);
+#else
+        if (!cpuSet.empty()) {
+            MMC_LOG_WARN("Thread CPU affinity is configured but not supported on this platform");
+        }
+        setpriority(PRIO_PROCESS, 0, MIN_NICE);
+#endif
     }
 
     int32_t Start(bool bindCpu = false)
@@ -92,14 +191,16 @@ public:
             return MMC_ERROR;
         }
 
-        if (bindCpu) {
+        auto clientCpuSet = GetClientCpuSetFromEnv();
+        bool shouldBindCpu = bindCpu || !clientCpuSet.empty();
+        if (shouldBindCpu) {
             MMC_LOG_INFO("Threads in mmc thread pool configured to bind to cpu");
         }
 
         for (size_t i = 0; i < numThreads; ++i) {
-            workers.emplace_back([this, bindCpu] {
-                if (bindCpu) {
-                    TrySetThreadAffinityAndPriority();
+            workers.emplace_back([this, shouldBindCpu, clientCpuSet] {
+                if (shouldBindCpu) {
+                    TrySetThreadAffinityAndPriority(clientCpuSet);
                 }
                 while (true) {
                     std::function<void()> task;
@@ -168,6 +269,24 @@ public:
     MmcThreadPool &operator=(const MmcThreadPool &) = delete;
 
 private:
+    static inline std::mutex &DefaultClientCpuSetMutex()
+    {
+        static std::mutex mutex;
+        return mutex;
+    }
+
+    static inline std::vector<int32_t> &DefaultClientCpuSet()
+    {
+        static std::vector<int32_t> cpus;
+        return cpus;
+    }
+
+    static inline bool &HasDefaultClientCpuSet()
+    {
+        static bool hasCpuSet = false;
+        return hasCpuSet;
+    }
+
     std::vector<std::thread> workers;
     std::queue<std::function<void()>> taskQueue;
     std::mutex queueMutex;

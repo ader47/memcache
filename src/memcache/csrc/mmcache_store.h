@@ -67,6 +67,8 @@ public:
 
     int Setup(const local_config &config) override;
 
+    int SetClientCpuAffinity(const std::string &cpuSet);
+
     int Init(const uint32_t deviceId, const bool initBm = true) override;
 
     int TearDown() override;
