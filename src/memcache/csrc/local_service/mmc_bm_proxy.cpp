@@ -18,6 +18,21 @@
 
 namespace ock {
 namespace mmc {
+namespace {
+template <typename Option>
+auto SetSecondMapping(Option &option, bool enabled, int) -> decltype(option.isSecondMapping = enabled, true)
+{
+    option.isSecondMapping = enabled;
+    return true;
+}
+
+template <typename Option>
+bool SetSecondMapping(Option &, bool, long)
+{
+    return false;
+}
+}
+
 std::map<std::string, MmcRef<MmcBmProxy>> MmcBmProxyFactory::instances_;
 std::mutex MmcBmProxyFactory::instanceMutex_;
 
@@ -104,7 +119,11 @@ Result MmcBmProxy::InternalCreateBm(const mmc_bm_create_config_t &createConfig)
     option.localDRAMSize = createConfig.localDRAMSize;
     option.localHBMSize = createConfig.localHBMSize;
     option.dataOpType = opType;
-    option.isSecondMapping = createConfig.memoryPoolMode == "expanded";
+    bool isExpandedPoolMode = createConfig.memoryPoolMode == "expanded";
+    if (isExpandedPoolMode && !SetSecondMapping(option, isExpandedPoolMode, 0)) {
+        MMC_LOG_ERROR("MmcBmProxy expanded memory pool mode requires smem_bm_create_option_t::isSecondMapping");
+        return MMC_ERROR;
+    }
     option.flags = createConfig.flags;
     option.tag[0] = '\0';
     option.tagOpInfo[0] = '\0';
