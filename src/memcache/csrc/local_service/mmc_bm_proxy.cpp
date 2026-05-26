@@ -43,6 +43,17 @@ bool IsEnvEnabled(const char *name)
            std::string(value) == "on" || std::string(value) == "ON";
 }
 
+bool IsBmCopyEnabled()
+{
+    const char *value = std::getenv("MMC_ENABLE_BM_COPY");
+    if (value == nullptr) {
+        return true;
+    }
+
+    return !(std::string(value) == "0" || std::string(value) == "false" || std::string(value) == "FALSE" ||
+             std::string(value) == "off" || std::string(value) == "OFF");
+}
+
 uint32_t GetBatchCopyFlags(smem_bm_copy_type type)
 {
     if (!IsEnvEnabled("MMC_ENABLE_COPY_EXTEND")) {
@@ -195,7 +206,7 @@ Result MmcBmProxy::Copy(uint64_t srcBmAddr, uint64_t dstBmAddr, uint64_t size, s
     }
     TP_TRACE_BEGIN(TP_SMEM_BM_PUT);
     smem_copy_params params = {(const void *)srcBmAddr, (void *)dstBmAddr, size};
-    auto ret = smem_bm_copy(handle_, &params, type, 0);
+    auto ret = IsBmCopyEnabled() ? smem_bm_copy(handle_, &params, type, 0) : MMC_OK;
     TP_TRACE_END(TP_SMEM_BM_PUT, ret);
     return ret;
 }
@@ -218,7 +229,7 @@ Result MmcBmProxy::Put(const mmc_buffer *buf, uint64_t bmAddr, uint64_t size)
     }
     TP_TRACE_BEGIN(TP_SMEM_BM_PUT);
     smem_copy_params params = {(void *)(buf->addr + buf->offset), (void *)bmAddr, buf->len};
-    auto ret = smem_bm_copy(handle_, &params, type, ASYNC_COPY_FLAG);
+    auto ret = IsBmCopyEnabled() ? smem_bm_copy(handle_, &params, type, ASYNC_COPY_FLAG) : MMC_OK;
     TP_TRACE_END(TP_SMEM_BM_PUT, ret);
     return ret;
 }
@@ -240,7 +251,7 @@ Result MmcBmProxy::Get(const mmc_buffer *buf, uint64_t bmAddr, uint64_t size)
     }
     TP_TRACE_BEGIN(TP_SMEM_BM_GET);
     smem_copy_params params = {(void *)bmAddr, (void *)(buf->addr + buf->offset), buf->len};
-    auto ret = smem_bm_copy(handle_, &params, type, ASYNC_COPY_FLAG);
+    auto ret = IsBmCopyEnabled() ? smem_bm_copy(handle_, &params, type, ASYNC_COPY_FLAG) : MMC_OK;
     TP_TRACE_END(TP_SMEM_BM_GET, ret);
     return ret;
 }
@@ -322,6 +333,9 @@ Result MmcBmProxy::BatchPut(const MmcBufferArray &bufArr, const MmcMemBlobDesc &
         shift += MmcBufSize(*buf);
     }
     smem_batch_copy_params batch_params = {sources.data(), destinations.data(), dataSizes.data(), count};
+    if (!IsBmCopyEnabled()) {
+        return MMC_OK;
+    }
     return smem_bm_copy_batch(handle_, &batch_params, type, GetBatchCopyFlags(type));
 }
 
@@ -354,6 +368,9 @@ Result MmcBmProxy::BatchGet(const MmcBufferArray &bufArr, const MmcMemBlobDesc &
         shift += MmcBufSize(*buf);
     }
     smem_batch_copy_params batch_params = {sources.data(), destinations.data(), dataSizes.data(), count};
+    if (!IsBmCopyEnabled()) {
+        return MMC_OK;
+    }
     return smem_bm_copy_batch(handle_, &batch_params, type, GetBatchCopyFlags(type));
 }
 
@@ -380,7 +397,7 @@ Result MmcBmProxy::BatchDataPut(std::vector<void *> &sources, std::vector<void *
                                            static_cast<uint32_t>(sources.size())};
     uint64_t totalSize = std::accumulate(sizes.begin(), sizes.end(), 0ULL);
     TP_TRACE_BEGIN(TP_MMC_LOCAL_BATCH_PUT);
-    auto ret = smem_bm_copy_batch(handle_, &batch_params, type, GetBatchCopyFlags(type));
+    auto ret = IsBmCopyEnabled() ? smem_bm_copy_batch(handle_, &batch_params, type, GetBatchCopyFlags(type)) : MMC_OK;
     TP_TRACE_END(TP_MMC_LOCAL_BATCH_PUT, ret);
     TP_TRACE_RECORD(TP_MMC_LOCAL_BATCH_PUT_SIZE, totalSize * 1000ULL, 0);
     (void)totalSize;
@@ -410,7 +427,7 @@ Result MmcBmProxy::BatchDataGet(std::vector<void *> &sources, std::vector<void *
                                            static_cast<uint32_t>(sources.size())};
     uint64_t totalSize = std::accumulate(sizes.begin(), sizes.end(), 0ULL);
     TP_TRACE_BEGIN(TP_MMC_LOCAL_BATCH_GET);
-    auto ret = smem_bm_copy_batch(handle_, &batch_params, type, GetBatchCopyFlags(type));
+    auto ret = IsBmCopyEnabled() ? smem_bm_copy_batch(handle_, &batch_params, type, GetBatchCopyFlags(type)) : MMC_OK;
     TP_TRACE_END(TP_MMC_LOCAL_BATCH_GET, ret);
     TP_TRACE_RECORD(TP_MMC_LOCAL_BATCH_GET_SIZE, totalSize * 1000ULL, 0);
     (void)totalSize;
