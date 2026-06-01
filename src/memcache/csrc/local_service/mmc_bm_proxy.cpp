@@ -20,6 +20,8 @@
 namespace ock {
 namespace mmc {
 namespace {
+constexpr uint32_t MTE_DISPATCH_FLAG = 2;
+
 template <typename Option>
 auto SetSecondMapping(Option &option, bool enabled, int) -> decltype(option.isSecondMapping = enabled, true)
 {
@@ -33,16 +35,6 @@ bool SetSecondMapping(Option &, bool, long)
     return false;
 }
 
-bool IsEnvEnabled(const char *name)
-{
-    const char *value = std::getenv(name);
-    if (value == nullptr) {
-        return false;
-    }
-    return std::string(value) == "1" || std::string(value) == "true" || std::string(value) == "TRUE" ||
-           std::string(value) == "on" || std::string(value) == "ON";
-}
-
 bool IsBmCopyEnabled()
 {
     const char *value = std::getenv("MMC_ENABLE_BM_COPY");
@@ -52,22 +44,6 @@ bool IsBmCopyEnabled()
 
     return !(std::string(value) == "0" || std::string(value) == "false" || std::string(value) == "FALSE" ||
              std::string(value) == "off" || std::string(value) == "OFF");
-}
-
-uint32_t GetBatchCopyFlags(smem_bm_copy_type type)
-{
-    if (!IsEnvEnabled("MMC_ENABLE_COPY_EXTEND")) {
-        return 0;
-    }
-
-    switch (type) {
-        case SMEMB_COPY_L2G:
-        case SMEMB_COPY_G2L:
-        case SMEMB_COPY_G2G:
-            return COPY_EXTEND_FLAG;
-        default:
-            return 0;
-    }
 }
 }
 
@@ -336,7 +312,7 @@ Result MmcBmProxy::BatchPut(const MmcBufferArray &bufArr, const MmcMemBlobDesc &
     if (!IsBmCopyEnabled()) {
         return MMC_OK;
     }
-    return smem_bm_copy_batch(handle_, &batch_params, type, GetBatchCopyFlags(type));
+    return smem_bm_copy_batch(handle_, &batch_params, type, MTE_DISPATCH_FLAG);
 }
 
 Result MmcBmProxy::BatchGet(const MmcBufferArray &bufArr, const MmcMemBlobDesc &blob)
@@ -371,7 +347,7 @@ Result MmcBmProxy::BatchGet(const MmcBufferArray &bufArr, const MmcMemBlobDesc &
     if (!IsBmCopyEnabled()) {
         return MMC_OK;
     }
-    return smem_bm_copy_batch(handle_, &batch_params, type, GetBatchCopyFlags(type));
+    return smem_bm_copy_batch(handle_, &batch_params, type, MTE_DISPATCH_FLAG);
 }
 
 Result MmcBmProxy::BatchDataPut(std::vector<void *> &sources, std::vector<void *> &destinations,
@@ -397,7 +373,7 @@ Result MmcBmProxy::BatchDataPut(std::vector<void *> &sources, std::vector<void *
                                            static_cast<uint32_t>(sources.size())};
     uint64_t totalSize = std::accumulate(sizes.begin(), sizes.end(), 0ULL);
     TP_TRACE_BEGIN(TP_MMC_LOCAL_BATCH_PUT);
-    auto ret = IsBmCopyEnabled() ? smem_bm_copy_batch(handle_, &batch_params, type, GetBatchCopyFlags(type)) : MMC_OK;
+    auto ret = IsBmCopyEnabled() ? smem_bm_copy_batch(handle_, &batch_params, type, MTE_DISPATCH_FLAG) : MMC_OK;
     TP_TRACE_END(TP_MMC_LOCAL_BATCH_PUT, ret);
     TP_TRACE_RECORD(TP_MMC_LOCAL_BATCH_PUT_SIZE, totalSize * 1000ULL, 0);
     (void)totalSize;
@@ -427,7 +403,7 @@ Result MmcBmProxy::BatchDataGet(std::vector<void *> &sources, std::vector<void *
                                            static_cast<uint32_t>(sources.size())};
     uint64_t totalSize = std::accumulate(sizes.begin(), sizes.end(), 0ULL);
     TP_TRACE_BEGIN(TP_MMC_LOCAL_BATCH_GET);
-    auto ret = IsBmCopyEnabled() ? smem_bm_copy_batch(handle_, &batch_params, type, GetBatchCopyFlags(type)) : MMC_OK;
+    auto ret = IsBmCopyEnabled() ? smem_bm_copy_batch(handle_, &batch_params, type, MTE_DISPATCH_FLAG) : MMC_OK;
     TP_TRACE_END(TP_MMC_LOCAL_BATCH_GET, ret);
     TP_TRACE_RECORD(TP_MMC_LOCAL_BATCH_GET_SIZE, totalSize * 1000ULL, 0);
     (void)totalSize;
